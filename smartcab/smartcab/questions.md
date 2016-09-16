@@ -1,3 +1,0 @@
-## 1. QUESTION: Observe what you see with the agent's behavior as it takes random actions. Does the smartcab eventually make it to the destination? Are there any other interesting observations to note?
-
-Making the smartcab take random actions means that the smartcab is just driving around the city with no particular purpose. It eventually reaches it's destination, but it's very frustrating to see that sometimes it's very close to reaching its destination and just begins to drive away from it. The cab pays no attention to the rewards as it does not care about reaching the destination on time or avoiding infractions. 
