@@ -44,8 +44,8 @@ class LearningAgent(Agent):
             for oncoming in VALID_ACTIONS:
                 for right in VALID_ACTIONS:
                     for left in VALID_ACTIONS:
-                        for next_waypont in VALID_ACTIONS:
-                            for hurry_up in ['yes', 'no']:
+                        for hurry_up in ['yes', 'no']:
+                            for next_waypont in VALID_ACTIONS:
                                 all_inputs.append('{}-{}-{}-{}-{}-{}'.format(
                                 light, oncoming, right, left, hurry_up,
                                 next_waypont))
