@@ -4,13 +4,20 @@ from environment import Agent, Environment
 from planner import RoutePlanner
 from simulator import Simulator
 
+
 class LearningAgent(Agent):
     """An agent that learns to drive in the smartcab world."""
 
     def __init__(self, env):
-        super(LearningAgent, self).__init__(env)  # sets self.env = env, state = None, next_waypoint = None, and a default color
-        self.color = 'red'  # override color
-        self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
+        # sets self.env = env, state = None, next_waypoint = None,
+        # and a default color
+
+        super(LearningAgent, self).__init__(env)
+
+        # override color
+        self.color = 'red'
+        # simple route planner to get next_waypoint
+        self.planner = RoutePlanner(self.env, self)
         # TODO: Initialize any additional variables here
 
         # Keys: light-oncoming-right-left
@@ -26,7 +33,7 @@ class LearningAgent(Agent):
         self.total_reward = 0
 
         # Logging
-        logging.basicConfig(filename='smartcab.log',level=logging.DEBUG)
+        logging.basicConfig(filename='smartcab.log', level=logging.DEBUG)
 
     def generate_states_dict_with_empty_rewards(self):
 
@@ -37,7 +44,7 @@ class LearningAgent(Agent):
         # Store all input combinations
         all_inputs = []
 
-        # Dicitonary with all possible combinations, with rewards 0
+        # Dictionary with all possible combinations, with rewards 0
         states = {}
 
         for light in LIGHT:
@@ -47,8 +54,8 @@ class LearningAgent(Agent):
                         for hurry_up in ['yes', 'no']:
                             for next_waypont in VALID_ACTIONS:
                                 all_inputs.append('{}-{}-{}-{}-{}-{}'.format(
-                                light, oncoming, right, left, hurry_up,
-                                next_waypont))
+                                    light, oncoming, right, left, hurry_up,
+                                    next_waypont))
 
         for possible_input in all_inputs:
             states[possible_input] = {}
@@ -113,7 +120,8 @@ class LearningAgent(Agent):
         """
         It's called "get_action_by_cheating" because if the cab is in a hurry
         (meaning that it has less than 10 moves left), then the cab will
-        follow the next_waypoint by waiting correctly when it has to wait (i.e. we are telling it what to do, and it has not really learned it
+        follow the next_waypoint by waiting correctly when it has to wait
+        (i.e. we are telling it what to do, and it has not really learned it
         on it's own.)
         """
         if deadline < 10:
@@ -155,12 +163,14 @@ class LearningAgent(Agent):
         # TODO: Prepare for a new trip; reset any variables here, if required
         logging.debug(
             'Gamma {}, Epsilon {}, Cumulative Reward: {}'.format(
-            self.gamma, self.epsilon, self.total_reward))
+                self.gamma, self.epsilon, self.total_reward))
 
     def update(self, t):
 
         # Gather inputs
-        self.next_waypoint = self.planner.next_waypoint()  # from route planner, also displayed by simulator
+
+        # from route planner, also displayed by simulator
+        self.next_waypoint = self.planner.next_waypoint()
         inputs = self.env.sense(self)
         deadline = self.env.get_deadline(self)
 
@@ -191,7 +201,10 @@ class LearningAgent(Agent):
         self.states[state][action] += self.gamma * max(
             self.states[next_state].values())
 
-        print "LearningAgent.update(): deadline = {}, inputs = {}, action = {}, reward = {}".format(deadline, inputs, action, reward)  # [debug]
+        # [debug]
+        print "LearningAgent.update(): deadline = {}, inputs = {}, " \
+              "action = {}, reward = {}".format(
+            deadline, inputs, action, reward)
 
 
 def run():
@@ -204,8 +217,10 @@ def run():
     # NOTE: You can set enforce_deadline=False while debugging to allow longer trials
 
     # Now simulate it
-    sim = Simulator(e, update_delay=0.01, display=False)  # create simulator (uses pygame when display=True, if available)
-    # NOTE: To speed up simulation, reduce update_delay and/or set display=False
+    # create simulator (uses pygame when display=True, if available)
+    # NOTE: To speed up simulation, reduce update_delay and/or set
+    # display=False
+    sim = Simulator(e, update_delay=0.01, display=False)
 
     sim.run(n_trials=101)  # run for a specified number of trials
     # NOTE: To quit midway, press Esc or close pygame window, or hit Ctrl+C on the command-line
