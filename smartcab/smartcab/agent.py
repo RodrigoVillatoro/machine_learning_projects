@@ -17,7 +17,7 @@ class LearningAgent(Agent):
         self.states = self.generate_states_dict_with_empty_rewards()
 
         # Will define the next action we take (random vs learned)
-        self.epsilon = 0.50
+        self.epsilon = 0.10
 
         # Gamma
         self.gamma = 0.15
