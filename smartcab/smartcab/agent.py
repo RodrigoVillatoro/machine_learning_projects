@@ -55,12 +55,11 @@ class LearningAgent(Agent):
 
         for light in LIGHT:
             for oncoming in VALID_ACTIONS:
-                for right in VALID_ACTIONS:
                     for left in VALID_ACTIONS:
                         for hurry_up in ['yes', 'no']:
                             for next_waypont in VALID_ACTIONS:
-                                all_inputs.append('{}-{}-{}-{}-{}-{}'.format(
-                                    light, oncoming, right, left, hurry_up,
+                                all_inputs.append('{}-{}-{}-{}-{}'.format(
+                                    light, oncoming, left, hurry_up,
                                     next_waypont))
 
         for possible_input in all_inputs:
@@ -73,7 +72,8 @@ class LearningAgent(Agent):
     def update_state(self, inputs, deadline, next_waypoint):
 
         # Input values will serve as key in states dictionary
-        input_values = [str(value) for key, value in inputs.items()]
+        input_values = [str(value) for key, value in inputs.items()
+                        if key != 'right']
 
         if deadline < 20:
             hurry_up = 'yes'
