@@ -23,14 +23,20 @@ class LearningAgent(Agent):
         # Keys: light-oncoming-right-left
         self.states = self.generate_states_dict_with_empty_rewards()
 
-        # Will define the next action we take (random vs learned)
-        self.epsilon = 0.10
+        # Parameters
+        self.epsilon = 0.10  # explore vs exploit
+        self.gamma = 0.15  # discount factor
+        self.alpha = 0.30  # learning rate
 
-        # Gamma
-        self.gamma = 0.15
-
-        # Total reward obtained:
+        # Cumulative reward obtained:
         self.total_reward = 0
+
+        # Counter of positive rewards (for report)
+        self.num_total_rewards = 0
+        self.num_negative_rewards = 0
+
+        # Did the agent reach it's destination on time?
+        self.reached_destination = False
 
         # Logging
         logging.basicConfig(filename='smartcab.log', level=logging.DEBUG)
@@ -85,7 +91,6 @@ class LearningAgent(Agent):
         """ When we are in a hurry, one alternative would be to just follow the
         next_waypoint and wait when we needed to wait.
         """
-        state = None
         if inputs['light'] == 'green':
             # 0: Green light, not turning left --will continue forward or right
             if next_waypoint != 'left':
@@ -126,16 +131,15 @@ class LearningAgent(Agent):
         """
         if deadline < 10:
             action = self.follow_next_waypoint_directly_from_plan(
-                inputs, self.next_waypoint)
+                inputs, next_waypoint)
         else:
-            # Explore
             random_number = random.uniform(0, 1)
             if random_number < self.epsilon:
-                # Take random action:
+                # Explore: take random action
                 action = random.choice([None, 'forward', 'left', 'right'])
             # Exploit
             else:
-                # Take action with maximum reward
+                # Exploit: take action with maximum reward
                 action = max(self.states[state], key=self.states[state].get)
 
         return action
@@ -146,14 +150,12 @@ class LearningAgent(Agent):
         a random action in case the random number generated is less than
         self.epsilon.
         """
-        # Explore
         random_number = random.uniform(0, 1)
         if random_number < self.epsilon:
-            # Take random action:
+            # Explore: take random action
             action = random.choice([None, 'forward', 'left', 'right'])
-        # Exploit
         else:
-            # Take action with maximum reward
+            # Exploit: take action with maximum reward
             action = max(self.states[state], key=self.states[state].get)
 
         return action
@@ -161,9 +163,23 @@ class LearningAgent(Agent):
     def reset(self, destination=None):
         self.planner.route_to(destination)
         # TODO: Prepare for a new trip; reset any variables here, if required
+
+        # Calculate the percentage of negative rewards
+        try:
+            pct_neg_rewards = \
+                float(self.num_negative_rewards)/float(self.num_total_rewards)
+            pct_neg_rewards = round(pct_neg_rewards * 100, 1)
+        except ZeroDivisionError:
+            pct_neg_rewards = 0
+
         logging.debug(
-            'Gamma {}, Epsilon {}, Cumulative Reward: {}'.format(
-                self.gamma, self.epsilon, self.total_reward))
+            'Gamma {}, Alpha {}, Epsilon {}, Rewards: {} : {} : {}'.format(
+                self.gamma, self.alpha, self.epsilon, self.total_reward,
+                pct_neg_rewards, int(self.reached_destination)))
+
+        # Reset rewards
+        self.num_total_rewards = 0
+        self.num_negative_rewards = 0
 
     def update(self, t):
 
@@ -175,18 +191,23 @@ class LearningAgent(Agent):
         deadline = self.env.get_deadline(self)
 
         # TODO: Update state
-        state = self.update_state(inputs, deadline, self.next_waypoint)
-        self.state = state
+        self.state = self.update_state(inputs, deadline, self.next_waypoint)
 
         # Get action the smartcab should execute
-        action = self.get_action(state)
+        action = self.get_action(self.state)
 
         # Execute action and get reward
         reward = self.env.act(self, action)
-        self.states[state][action] += reward
+        self.states[self.state][action] += reward
 
         # Increment total reward
         self.total_reward += reward
+
+        # Increment counter (for final report)
+        self.num_total_rewards += 1
+
+        if reward < 0:
+            self.num_negative_rewards += 1
 
         # TODO: Learn policy based on state, action, reward
 
@@ -196,15 +217,17 @@ class LearningAgent(Agent):
         next_state = self.update_state(inputs, deadline, self.next_waypoint)
 
         # Learn Q
-        # Q(s, a) = R(s, a) + Gamma * Max[Q(next state, all actions)]
-        # http://mnemstudio.org/path-finding-q-learning-tutorial.htm
-        self.states[state][action] += self.gamma * max(
-            self.states[next_state].values())
+        self.states[self.state][action] += self.alpha * (
+            reward + self.gamma * max(self.states[next_state].values()) -
+            self.states[self.state][action])
 
         # [debug]
         print "LearningAgent.update(): deadline = {}, inputs = {}, " \
               "action = {}, reward = {}".format(
-            deadline, inputs, action, reward)
+                deadline, inputs, action, reward)
+
+        # For final report
+        self.reached_destination = self.env.done
 
 
 def run():
@@ -214,17 +237,20 @@ def run():
     e = Environment()  # create environment (also adds some dummy traffic)
     a = e.create_agent(LearningAgent)  # create agent
     e.set_primary_agent(a, enforce_deadline=True)  # specify agent to track
-    # NOTE: You can set enforce_deadline=False while debugging to allow longer trials
+    # NOTE: You can set enforce_deadline=False while debugging to
+    # allow longer trials
 
     # Now simulate it
     # create simulator (uses pygame when display=True, if available)
     # NOTE: To speed up simulation, reduce update_delay and/or set
     # display=False
-    sim = Simulator(e, update_delay=0.15, display=True)
+    sim = Simulator(e, update_delay=0.01, display=False)
 
-    sim.run(n_trials=100)  # run for a specified number of trials
-    # NOTE: To quit midway, press Esc or close pygame window, or hit Ctrl+C on the command-line
+    sim.run(n_trials=101)  # run for a specified number of trials
+    # NOTE: To quit midway, press Esc or close pygame window,
+    # or hit Ctrl+C on the command-line
 
 
 if __name__ == '__main__':
-    run()
+    for i in range(0, 3):
+        run()
