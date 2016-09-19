@@ -24,9 +24,9 @@ class LearningAgent(Agent):
         self.states = self.generate_states_dict_with_empty_rewards()
 
         # Parameters
-        self.epsilon = 0.10  # explore vs exploit
-        self.gamma = 0.15  # discount factor
+        self.gamma = 0.75  # discount factor
         self.alpha = 0.30  # learning rate
+        self.epsilon = 0.10  # explore vs exploit
 
         # Cumulative reward obtained:
         self.total_reward = 0
@@ -37,6 +37,9 @@ class LearningAgent(Agent):
 
         # Did the agent reach it's destination on time?
         self.reached_destination = False
+
+        # To record infractions
+        self.infractions = []
 
         # Logging
         logging.basicConfig(filename='smartcab.log', level=logging.DEBUG)
@@ -173,13 +176,15 @@ class LearningAgent(Agent):
             pct_neg_rewards = 0
 
         logging.debug(
-            'Gamma {}, Alpha {}, Epsilon {}, Rewards: {} : {} : {}'.format(
+            'Gamma {}, Alpha {}, Epsilon {}, Rewards: {} : {} : {}: {}'.format(
                 self.gamma, self.alpha, self.epsilon, self.total_reward,
-                pct_neg_rewards, int(self.reached_destination)))
+                pct_neg_rewards, int(self.reached_destination),
+                self.infractions))
 
         # Reset rewards
         self.num_total_rewards = 0
         self.num_negative_rewards = 0
+        self.infractions = []
 
     def update(self, t):
 
@@ -208,6 +213,7 @@ class LearningAgent(Agent):
 
         if reward < 0:
             self.num_negative_rewards += 1
+            self.infractions.append((self.state, action))
 
         # TODO: Learn policy based on state, action, reward
 
