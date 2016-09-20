@@ -155,6 +155,9 @@ class LearningAgent(Agent):
             print('New infraction: ({}, {}): {}'.format(
                 self.state, action, reward))
 
+        # For final report
+        self.reached_destination = self.env.done
+
         # TODO: Learn policy based on state, action, reward
 
         # Gather inputs for next trip
@@ -171,9 +174,6 @@ class LearningAgent(Agent):
         print "LearningAgent.update(): deadline = {}, inputs = {}, " \
               "action = {}, reward = {}".format(
                 deadline, inputs, action, reward)
-
-        # For final report
-        self.reached_destination = self.env.done
 
     # ------------------------------
     # THE FOLLOWING 2 FUNCTIONS ARE HERE FOR REFERENCE BUT ARE NOT BEING
