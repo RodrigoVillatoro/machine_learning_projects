@@ -38,9 +38,6 @@ class LearningAgent(Agent):
         # Did the agent reach it's destination on time?
         self.reached_destination = False
 
-        # To record infractions
-        self.infractions = []
-
         # Logging
         logging.basicConfig(filename='smartcab.log', level=logging.DEBUG)
 
@@ -49,6 +46,7 @@ class LearningAgent(Agent):
         # Dictionary to store states: keys are inputs, values are rewards
         LIGHT = ['red', 'green']
         VALID_ACTIONS = [None, 'forward', 'left', 'right']
+        POSSIBLE_WAYPOINTS = ['forward', 'left', 'right']
 
         # Store all input combinations
         all_inputs = []
@@ -60,7 +58,7 @@ class LearningAgent(Agent):
             for oncoming in VALID_ACTIONS:
                     for left in VALID_ACTIONS:
                         for hurry_up in ['yes', 'no']:
-                            for next_waypont in VALID_ACTIONS:
+                            for next_waypont in POSSIBLE_WAYPOINTS:
                                 all_inputs.append('{}-{}-{}-{}-{}'.format(
                                     light, oncoming, left, hurry_up,
                                     next_waypont))
@@ -89,63 +87,6 @@ class LearningAgent(Agent):
         state += '-{}'.format(next_waypoint)
 
         return state
-
-    def follow_next_waypoint_directly_from_plan(self, inputs, next_waypoint):
-        """ When we are in a hurry, one alternative would be to just follow the
-        next_waypoint and wait when we needed to wait.
-        """
-        if inputs['light'] == 'green':
-            # 0: Green light, not turning left --will continue forward or right
-            if next_waypoint != 'left':
-                state = 'move'
-            else:
-                # 1: Green light, turning left, NO oncoming traffic.
-                if inputs['oncoming'] is None or inputs['oncoming'] == 'left':
-                    state = 'move'
-                # 2: Green light, turning left, going forward or turning right.
-                else:
-                    state = 'wait'
-        else:  # Red light
-            # 3: Red light, moving forward.
-            if next_waypoint == 'forward':
-                state = 'wait'
-            # 4: Red light, turning right, NO oncoming traffic.
-            elif next_waypoint == 'right' and inputs['left'] != 'forward':
-                state = 'move'
-            # 5: Red light, turning right, cars coming our way.
-            else:
-                state = 'wait'
-
-        # TODO: Select action according to your policy
-        if state == 'move':
-            action = next_waypoint
-        else:
-            action = None
-
-        return action
-
-    def get_action_by_cheating(self, deadline, inputs, next_waypoint, state):
-        """
-        It's called "get_action_by_cheating" because if the cab is in a hurry
-        (meaning that it has less than 10 moves left), then the cab will
-        follow the next_waypoint by waiting correctly when it has to wait
-        (i.e. we are telling it what to do, and it has not really learned it
-        on it's own.)
-        """
-        if deadline < 10:
-            action = self.follow_next_waypoint_directly_from_plan(
-                inputs, next_waypoint)
-        else:
-            random_number = random.uniform(0, 1)
-            if random_number < self.epsilon:
-                # Explore: take random action
-                action = random.choice([None, 'forward', 'left', 'right'])
-            # Exploit
-            else:
-                # Exploit: take action with maximum reward
-                action = max(self.states[state], key=self.states[state].get)
-
-        return action
 
     def get_action(self, state):
         """
@@ -176,15 +117,13 @@ class LearningAgent(Agent):
             pct_neg_rewards = 0
 
         logging.debug(
-            'Gamma {}, Alpha {}, Epsilon {}, Rewards: {} : {} : {}: {}'.format(
+            'Gamma {}, Alpha {}, Epsilon {}, Rewards: {} : {} : {}'.format(
                 self.gamma, self.alpha, self.epsilon, self.total_reward,
-                pct_neg_rewards, int(self.reached_destination),
-                self.infractions))
+                pct_neg_rewards, int(self.reached_destination)))
 
         # Reset rewards
         self.num_total_rewards = 0
         self.num_negative_rewards = 0
-        self.infractions = []
 
     def update(self, t):
 
@@ -213,7 +152,8 @@ class LearningAgent(Agent):
 
         if reward < 0:
             self.num_negative_rewards += 1
-            self.infractions.append((self.state, action))
+            print('New infraction: ({}, {}): {}'.format(
+                self.state, action, reward))
 
         # TODO: Learn policy based on state, action, reward
 
@@ -234,6 +174,73 @@ class LearningAgent(Agent):
 
         # For final report
         self.reached_destination = self.env.done
+
+    # ------------------------------
+    # THE FOLLOWING 2 FUNCTIONS ARE HERE FOR REFERENCE BUT ARE NOT BEING
+    # USED IN THE FINAL IMPLEMENTATION. FEEL FREE TO IGNORE THEM.
+    # ------------------------------
+
+    def follow_next_waypoint_directly_from_plan(self, inputs, next_waypoint):
+        """ When we are in a hurry, one alternative would be to just follow the
+        next_waypoint and wait when we needed to wait.
+        - - - - - -
+        NOTE: This function is just here for reference and it's not being used
+        in the final implementation.
+        """
+        if inputs['light'] == 'green':
+            # 0: Green light, not turning left --will continue forward or right
+            if next_waypoint != 'left':
+                state = 'move'
+            else:
+                # 1: Green light, turning left, NO oncoming traffic.
+                if inputs['oncoming'] is None or inputs['oncoming'] == 'left':
+                    state = 'move'
+                # 2: Green light, turning left, going forward or turning right.
+                else:
+                    state = 'wait'
+        else:  # Red light
+            # 3: Red light, moving forward.
+            if next_waypoint == 'forward':
+                state = 'wait'
+            # 4: Red light, turning right, NO oncoming traffic.
+            elif next_waypoint == 'right' and inputs['left'] != 'forward':
+                state = 'move'
+            # 5: Red light, turning right, cars coming our way.
+            else:
+                state = 'wait'
+
+        if state == 'move':
+            action = next_waypoint
+        else:
+            action = None
+
+        return action
+
+    def get_action_by_cheating(self, deadline, inputs, next_waypoint, state):
+        """
+        It's called "get_action_by_cheating" because if the cab is in a hurry
+        (meaning that it has less than 10 moves left), then the cab will
+        follow the next_waypoint by waiting correctly when it has to wait
+        (i.e. we are telling it what to do, and it has not really learned it
+        on it's own.)
+        - - - - - -
+        NOTE: This function is just here for reference and it's not being used
+        in the final implementation.
+        """
+        if deadline < 10:
+            action = self.follow_next_waypoint_directly_from_plan(
+                inputs, next_waypoint)
+        else:
+            random_number = random.uniform(0, 1)
+            if random_number < self.epsilon:
+                # Explore: take random action
+                action = random.choice([None, 'forward', 'left', 'right'])
+            # Exploit
+            else:
+                # Exploit: take action with maximum reward
+                action = max(self.states[state], key=self.states[state].get)
+
+        return action
 
 
 def run():
@@ -258,5 +265,4 @@ def run():
 
 
 if __name__ == '__main__':
-    for i in range(0, 3):
-        run()
+    run()
