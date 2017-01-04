@@ -1,5 +1,7 @@
 import numpy as np
 
+from terrain import Terrain
+
 # global dictionaries for robot movement and sensing
 dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
@@ -11,6 +13,17 @@ dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
                'up': 'd', 'right': 'l', 'down`': 'u', 'left': 'r'}
 
 
+wall_index = {'l': 0, 'u': 1, 'r': 2, 'd': 3,
+              'left': 0, 'up': 1, 'right': 2, 'down': 3}
+inc_location = {}
+
+# Stack where we push cells that need to be checked for updating
+# cells_stack = []
+
+# Distance placeholder for walls
+WALL_VALUE = 10000
+
+
 class Robot(object):
     def __init__(self, maze_dim):
         '''
@@ -19,17 +32,14 @@ class Robot(object):
         provided based on common information, including the size of the maze
         the robot is placed in.
         '''
+        self.total_moves = 0  # Store total number of moves made by the robot
+        self.reached_destination = False  # Did the robot reach the center?
+        self.prev_location = None  # Store previous cell
+        self.robot_pos = {'location': [0, 0], 'heading': 'up'}  # Current pos
+        self.last_movement = 0  # 1 if robot advanced, 0 if it only rotated
 
-        self.location = [0, 0]
-        self.heading = 'up'
-        self.maze_dim = maze_dim
-        self.maze_distances = np.empty([maze_dim, maze_dim], dtype=int)
-        self.robot_pos = {'location': [0, 0], 'heading': 'up'}
-        self.prev_states = []
-        self.visited_cells = np.zeros([maze_dim, maze_dim], dtype=int)
-
-        self.fill_maze()
-        self.print_maze()
+        self.terrain = Terrain(maze_dim)
+        self.terrain.draw()
 
     def next_move(self, sensors):
         '''
@@ -53,219 +63,153 @@ class Robot(object):
         the tester to end the run and return the robot to the start.
         '''
 
-        rotation = 0
-        movement = 0
+        # Store direction and current location
+        heading = self.robot_pos['heading']
+        location = self.robot_pos['location']
+        x = location[0]
+        y = location[1]
 
-        adj_distances = self.get_adjacent_distances(sensors)
-        min_distance = min(adj_distances)
-        min_index = adj_distances.index(min_distance)
-
-        # Left
-        if min_index == 0:
-            rotation = -90
-            movement = 1
-        # Up
-        elif min_index == 1:
+        # If it's the starting position, just move forward
+        if location == [0, 0]:
             rotation = 0
             movement = 1
-        # Right
-        elif min_index == 2:
-            rotation = 90
-            movement = 1
+            walls = [1, 0, 1, 1]
+            self.store_last_movement(movement)
+            self.total_moves += 1
 
+            # Update terrain
+            self.terrain.update(x, y, walls, heading)
 
-        # TODO: delete this line
-        import pdb; pdb.set_trace()
+        # If not, first update distances, then get next move
+        else:
 
-        # Check if there was any change
-        if movement != 0:
+            # 1) Push current location to stack
+            self.terrain.cells_to_check.append(location)
 
-            print('MIN INDEX: {}'.format(min_index))
+            # 2) Add newly discovered walls
+            walls = self.get_walls_for_current_location(x, y, sensors)
 
-            print('------------')
-            print('before... MOVING {}'.format(self.robot_pos['heading']))
-            print(sensors)
-            print(self.robot_pos)
+            # 3) Update terrain and distances
+            self.terrain.update(x, y, walls, heading)
 
-            self.mark_cell_as_visited()
-            self.store_prev_state(sensors)
-            self.perform_movement(rotation)
+            # 4) Get next move
+            rotation, movement = self.get_next_move(sensors)
 
-            print('after... MOVING {}'.format(self.robot_pos['heading']))
-            print(self.robot_pos)
-            print('------------')
+        self.terrain.draw()
 
-
-        #
-        # # check right
-        # if sensors[2] is not 0:
-        #
-        #     rotation = 90
-        #     movement = 1
-        #
-        #     print('------------')
-        #     print('before... MOVING RIGHT')
-        #     print(sensors)
-        #     print(self.robot_pos)
-        #
-        #     self.store_prev_state(sensors)
-        #     self.perform_movement(rotation)
-        #
-        #     print('after... MOVING RIGHT')
-        #     print(self.robot_pos)
-        #     print('------------')
-        #
-        # # move up
-        # elif sensors[1] is not 0:
-        #
-        #     rotation = 0
-        #     movement = 1
-        #
-        #     print('------------')
-        #     print('before... MOVING UP')
-        #     print(sensors)
-        #     print(self.robot_pos)
-        #
-        #     self.store_prev_state(sensors)
-        #     self.perform_movement(rotation)
-        #
-        #     print('after... MOVING UP')
-        #     print(self.robot_pos)
-        #     print('------------')
-        #
-        # # move left
-        # elif sensors[0] is not 0:
-        #
-        #     rotation = -90
-        #     movement = 1
-        #
-        #     print('------------')
-        #     print('before... MOVING LEFT')
-        #     print(sensors)
-        #     print(self.robot_pos)
-        #
-        #     self.store_prev_state(sensors)
-        #     self.perform_movement(rotation)
-        #
-        #     print('after... MOVING LEFT')
-        #     print(sensors)
-        #     print(self.robot_pos)
-        #     print('------------')
-        #
-        # # dead end
-        # else:
-        #     pass
+        self.update_location(rotation, movement)
 
         return rotation, movement
 
-    def fill_maze(self):
+    def get_walls_for_current_location(self, x, y, sensors):
 
-        center = self.maze_dim / 2
-        max_distance = self.maze_dim - 2
+        # If it had been visited before, just return the values
+        if self.terrain.grid[x][y].direction != '':
+            return self.terrain.grid[x][y].walls
 
-        # Fill top left half
-        for i in range(0, center):
-            for j in range(center):
-                self.maze_distances[i][j] = max_distance - j - i
+        # Else, take note of the walls
+        # Placeholder
+        walls = [0, 0, 0, 0]
 
-        # The two rows in the center should be equal
-        for i in range(center, center + 1):
-            for j in range(0, center):
-                self.maze_distances[i][j] = self.maze_distances[i - 1][j]
-
-        # Fill bottom left half
-        for i in range(center + 1, self.maze_dim):
-            for j in range(0, center):
-                self.maze_distances[i][j] = self.maze_distances[i - 1][j] + 1
-
-        # The two rows in the center should have the same values
-        for i in range(0, self.maze_dim):
-            for j in range(center, center + 1):
-                self.maze_distances[i][j] = self.maze_distances[i][j - 1]
-
-        # Fill remaining columns
-        for i in range(0, self.maze_dim):
-            for j in range(center + 1, self.maze_dim):
-                self.maze_distances[i][j] = self.maze_distances[i][j - 1] + 1
-
-    def print_maze(self):
-        print(self.maze_distances)
-
-    def store_prev_state(self, sensors):
-
-        # Create stack of prev positions
-        x = self.robot_pos['location'][0]
-        y = self.robot_pos['location'][1]
-        location = [x, y]
+        # Store location values and heading
         heading = self.robot_pos['heading']
-        curr_dist = self.maze_distances[self.robot_pos[
-            'location'][0]][self.robot_pos['location'][1]]
-        adj_dist = self.get_adjacent_distances(sensors)
 
-        robot_state = [location, heading, sensors, curr_dist, adj_dist]
-        self.prev_states.append(robot_state)
-        print (self.prev_states)
+        # Change sensor info to wall info
+        walls_sensors = [1 if x == 0 else 0 for x in sensors]
 
-    def perform_movement(self, angle):
+        # Map walls to correct x and y coordinates
+        for i in range(len(walls_sensors)):
+            dir_sensor = dir_sensors[heading][i]
+            index = wall_index[dir_sensor]
+            walls[index] = walls_sensors[i]
+
+        # Update missing wall index (the cell right behind the robot)
+        index = wall_index[dir_reverse[heading]]
+        walls[index] = 0
+
+        return walls
+
+    def update_location(self, rotation, movement):
+
+        # Update previous location
+        self.prev_location = self.robot_pos['location']
 
         # Perform rotation
-        if angle == -90:
+        if rotation == -90:
             self.robot_pos['heading'] = \
                 dir_sensors[self.robot_pos['heading']][0]
-        elif angle == 90:
+        elif rotation == 90:
             self.robot_pos['heading'] = \
                 dir_sensors[self.robot_pos['heading']][2]
-        elif angle == 0:
+        elif rotation == 0:
             pass
         else:
             print "Invalid rotation value, no rotation performed."
 
         # Advance
-        print('*** DISTANCE FOR THIS LOCATION ***')
-        print(self.maze_distances[self.robot_pos[
-            'location'][0]][self.robot_pos['location'][1]])
+        if movement != 0:
+            self.robot_pos['location'][0] += \
+                dir_move[self.robot_pos['heading']][0]
+            self.robot_pos['location'][1] += \
+                dir_move[self.robot_pos['heading']][1]
 
-        self.robot_pos['location'][0] += \
-            dir_move[self.robot_pos['heading']][0]
-        self.robot_pos['location'][1] += \
-            dir_move[self.robot_pos['heading']][1]
+    def get_next_move(self, sensors):
+
+        # 1) Get adjacent distances from sensors
+        adj_distances = self.get_adjacent_distances(sensors)
+
+        # 2) Get the minimum distance and index of that distance
+        min_distance = min(adj_distances)
+        min_index = adj_distances.index(min_distance)
+
+        # 3) Use that information to make a decision
+        # Move Left
+        if min_index == 0:
+            rotation = -90
+            movement = 1
+        # Move Up
+        elif min_index == 1:
+            rotation = 0
+            movement = 1
+        # Move Right
+        elif min_index == 2:
+            rotation = 90
+            movement = 1
+        # Minimum distance is behind, so just rotate clockwise
+        else:
+            rotation = 90
+            movement = 0
+
+        self.store_last_movement(movement)
+        self.total_moves += 1
+
+        return rotation, movement
+
+    def store_last_movement(self, movement):
+        """
+        Take note if the last step was only a rotation
+        """
+        self.last_movement = movement
 
     def get_adjacent_distances(self, sensors):
 
-        distances = [10000, 10000, 10000]
+        # Placeholder (robot's coordinates)
+        distances = [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
 
-        curr_loc_x = self.robot_pos['location'][0]
-        curr_loc_y = self.robot_pos['location'][1]
+        # Store location values and heading
+        x = self.robot_pos['location'][0]
+        y = self.robot_pos['location'][1]
+        heading = self.robot_pos['heading']
 
-        # Left, simulate rotation of -90
-        if sensors[0] is not 0:
-            heading = dir_sensors[self.robot_pos['heading']][0]
-            new_loc_x = curr_loc_x + dir_move[heading][0]
-            new_loc_y = curr_loc_y + dir_move[heading][1]
-            distances[0] = self.maze_distances[new_loc_x][new_loc_y]
+        for i in range(len(sensors)):
+            if sensors[i] != 0:
+                dir_sensor = dir_sensors[heading][i]
+                distances[i] = self.terrain.get_distance(x, y, dir_sensor)
 
-        # Up, no rotation
-        if sensors[1] is not 0:
-            heading = self.robot_pos['heading']
-            new_loc_x = curr_loc_x + dir_move[heading][0]
-            new_loc_y = curr_loc_y + dir_move[heading][1]
-            distances[1] = self.maze_distances[new_loc_x][new_loc_y]
-
-        # Right, simulate rotation of 90
-        if sensors[2] is not 0:
-            heading = dir_sensors[self.robot_pos['heading']][2]
-            new_loc_x = curr_loc_x + dir_move[heading][0]
-            new_loc_y = curr_loc_y + dir_move[heading][1]
-            distances[2] = self.maze_distances[new_loc_x][new_loc_y]
+        # Update missing distance (cell right behind the robot)
+        # This is only valid if the last step was not just a rotation
+        if self.last_movement != 0:
+            behind = dir_reverse[heading]
+            distances[3] = self.terrain.get_distance(x, y, behind)
 
         return distances
-
-
-
-    def mark_cell_as_visited(self):
-        # Change axes order to get correct visual representation
-        y = self.robot_pos['location'][0]
-        # Modify x axis to get correct visual representation
-        x = self.maze_dim - self.robot_pos['location'][1] - 1
-        self.visited_cells[x][y] += 1
-        print(self.visited_cells)
