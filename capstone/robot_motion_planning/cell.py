@@ -1,18 +1,18 @@
 class Cell:
 
-    def __init__(self, walls=None, distance=0, direction=''):
+    def __init__(self, walls=None, distance=0, visited=''):
         """
         Simplified representation of the maze for debugging purposes
         :param walls: array of 0's (no walls) and 1's (walls) [l, u, r, d]
         :param distance: distance to the center of the maze
-        :param direction: values, < ^ > V. blank if not visited, * otherwise.
+        :param visited: values, < ^ > V. blank if not visited, * otherwise.
         """
         if walls is None:
             walls = [0, 0, 0, 0]
 
         self.walls = walls
         self.distance = distance
-        self.direction = direction
+        self.visited = visited
 
     def top(self):
         """
@@ -45,9 +45,9 @@ class Cell:
         if len(distance) == 1:
             cell += ' '
         cell += distance
-        if len(self.direction) == 0:
+        if len(self.visited) == 0:
             cell += ' '
-        cell += self.direction
+        cell += self.visited
         cell += ' '
         if self.walls[2]:
             cell += '|'
