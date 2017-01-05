@@ -2,6 +2,7 @@ from cell import Cell
 
 robot_directions = {'u': '^', 'r': '>', 'd': 'V', 'l': '<',
                     'up': '^', 'right': '>', 'down': 'V', 'left': '<'}
+opposite_wall = {'0': 2, '1': 3, '2': 0, '3': 1}
 
 WALL_VALUE = 10000
 
@@ -83,11 +84,15 @@ class Terrain:
 
         # Store new walls and heading values
         cell.walls = walls
-        cell.direction = robot_directions[heading]
+        cell.visited = robot_directions[heading]
+
+        # Update adjacent walls (i.e. right wall of cell A is left wall of B)
+        self.update_adjacent_walls(x, y, walls)
 
         # Change visual representation of direction (to draw it correctly)
-        if self.last_visited_cell is not None and self.last_visited_cell != cell:
-            self.last_visited_cell.direction = '*'
+        if self.last_visited_cell is not None \
+                and self.last_visited_cell != cell:
+            self.last_visited_cell.visited = '*'
 
         # Set last visited cell to this cell
         self.last_visited_cell = cell
@@ -182,6 +187,30 @@ class Terrain:
                             new_y = y - 1
 
                         # Add to stack only if location has been visited
-                        if self.grid[new_x][new_y].direction != '':
+                        if self.grid[new_x][new_y].visited != '':
                             location = [new_x, new_y]
                             self.cells_to_check.append(location)
+
+    def reset_visited_flags(self):
+        for x in range(self.maze_dim):
+            for y in range(self.maze_dim):
+                self.grid[x][y].visited = ''
+
+    def update_adjacent_walls(self, x, y, walls):
+        # Left
+        if self.is_valid_location(x - 1, y):
+            self.grid[x - 1][y].walls[opposite_wall['0']] = walls[0]
+        # Up
+        if self.is_valid_location(x, y + 1):
+            self.grid[x][y + 1].walls[opposite_wall['1']] = walls[1]
+        # Right
+        if self.is_valid_location(x + 1, y):
+            self.grid[x + 1][y].walls[opposite_wall['2']] = walls[2]
+        # Down
+        if self.is_valid_location(x, y - 1):
+            self.grid[x][y - 1].walls[opposite_wall['3']] = walls[3]
+
+    def is_valid_location(self, x, y):
+        return 0 <= x <= self.maze_dim - 1 and 0 <= y <= self.maze_dim - 1
+
+
