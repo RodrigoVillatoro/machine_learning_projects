@@ -1,18 +1,30 @@
 class Cell:
 
-    def __init__(self, walls=None, distance=0, visited=''):
+    def __init__(self, real_walls=None, distance=0, visited=''):
         """
         Simplified representation of the maze for debugging purposes
         :param walls: array of 0's (no walls) and 1's (walls) [l, u, r, d]
         :param distance: distance to the center of the maze
-        :param visited: values, < ^ > V. blank if not visited, * otherwise.
+        :param visited: directions = < ^ > V; x = dead end, * = visited
         """
-        if walls is None:
-            walls = [0, 0, 0, 0]
+        if real_walls is None:
+            real_walls = [0, 0, 0, 0]
 
-        self.walls = walls
+        self.real_walls = real_walls  # Actual walls on the maze
+        self.imaginary_walls = [0, 0, 0, 0]  # Walls added by the program
         self.distance = distance
         self.visited = visited
+
+    def get_total_walls(self):
+        """
+        Include imaginary walls in walls
+        :return: total walls... real and imaginary
+        """
+        total_walls = [0, 0, 0, 0]
+        for i in range(len(self.real_walls)):
+            if self.real_walls[i] == 1 or self.imaginary_walls[i] == 1:
+                total_walls[i] = 1
+        return total_walls
 
     def top(self):
         """
@@ -21,11 +33,12 @@ class Cell:
         :return: str with the first line that will visually represent a cell
         """
         cell = '+'
-        if self.walls[1]:
+        if self.real_walls[1]:
             cell += ' --- '
+        elif self.imaginary_walls[1]:
+            cell += ' ... '
         else:
             cell += '     '
-        cell += '+'
 
         return cell
 
@@ -37,7 +50,63 @@ class Cell:
         """
         distance = str(self.distance)
         cell = ''
-        if self.walls[0]:
+        if self.real_walls[0]:
+            cell += '|'
+        elif self.imaginary_walls[0]:
+            cell += ':'
+        else:
+            cell += ' '
+        cell += ' '
+        if len(distance) == 1:
+            cell += ' '
+        cell += distance
+        if len(self.visited) == 0:
+            cell += ' '
+        cell += self.visited
+        cell += ' '
+
+        return cell
+
+    def bottom(self):
+        """
+        Returns the formatted info of the bottom of the cell (wall or not
+        wall). Used to print the maze.
+        :return: str with the third line that will visually represent a cell
+        """
+        cell = '+'
+        if self.real_walls[3]:
+            cell += ' --- '
+        elif self.imaginary_walls[3]:
+            cell += ' ... '
+        else:
+            cell += '     '
+
+        return cell
+
+    def top_double(self):
+        """
+        Returns the formatted info of the top of the cell (wall or not wall).
+        Used to print the maze.
+        :return: str with the first line that will visually represent a cell
+        """
+        cell = '+'
+        if self.real_walls[1]:
+            cell += ' --- '
+        else:
+            cell += '     '
+        cell += '+'
+
+        return cell
+
+    def middle_double(self):
+        """
+        Returns the formatted info of the center of the cell (wall, distance,
+        visited). Used to print the maze.
+        :return: str with the second line that will visually represent a cell
+        """
+        distance = str(self.distance)
+        cell = ''
+        if self.real_walls[0]:
             cell += '|'
         else:
             cell += ' '
@@ -49,21 +118,21 @@ class Cell:
             cell += ' '
         cell += self.visited
         cell += ' '
-        if self.walls[2]:
+        if self.real_walls[2]:
             cell += '|'
         else:
             cell += ' '
 
         return cell
 
-    def bottom(self):
+    def bottom_double(self):
         """
         Returns the formatted info of the bottom of the cell (wall or not
         wall). Used to print the maze.
         :return: str with the third line that will visually represent a cell
         """
         cell = '+'
-        if self.walls[3]:
+        if self.real_walls[3]:
             cell += ' --- '
         else:
             cell += '     '
