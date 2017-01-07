@@ -116,7 +116,7 @@ class Robot(object):
 
         # # DEBUG:
         # if rotation == 'Reset' or self.round == 2:
-        self.terrain.draw()
+        self.terrain.draw_double()
         import pdb; pdb.set_trace()
 
         self.update_location(rotation, movement)
@@ -194,10 +194,17 @@ class Robot(object):
         if self.reached_destination:
             self.reset_values()
 
+    def number_of_walls(self, sensors):
+        number_of_walls  = 0
+        for sensor in sensors:
+            if sensor == 0:
+                number_of_walls += 1
+        return number_of_walls
+
     def get_next_move(self, x, y, heading, sensors):
 
         # If we reach a dead end:
-        if sensors == [0, 0, 0]:
+        if sensors == [0, 0, 0] or (self.number_of_walls(sensors) == 2 and self.last_movement == -1):
 
             # 1) Move back one step
             rotation = 0
