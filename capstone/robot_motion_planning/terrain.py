@@ -2,6 +2,7 @@ from cell import Cell
 
 dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
                'up': 'd', 'right': 'l', 'down`': 'u', 'left': 'r'}
+
 dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
                'up': ['l', 'u', 'r'], 'right': ['u', 'r', 'd'],
@@ -11,6 +12,7 @@ robot_directions = {'u': '^', 'r': '>', 'd': 'V', 'l': '<',
                     'up': '^', 'right': '>', 'down': 'V', 'left': '<'}
 
 opposite_wall = {'0': 2, '1': 3, '2': 0, '3': 1}
+
 index_walls = {'l': 0, 'u': 1, 'r': 2, 'd': 3,
                'left': 0, 'up': 1, 'right': 2, 'down': 3}
 
@@ -85,9 +87,9 @@ class Terrain:
         middle = '\n'
         bottom = '\n'
         for cell in cells:
-            top += cell.top()
-            middle += cell.middle()
-            bottom += cell.bottom()
+            top += cell.top_double()
+            middle += cell.middle_double()
+            bottom += cell.bottom_double()
         result = top + middle + bottom
         print(result)
 
@@ -119,9 +121,9 @@ class Terrain:
         for i, row in enumerate(reversed(mod_terrain)):
             self.print_row_of_cells_double(row)
 
-        # TODO: delete these lines
-        import pdb
-        pdb.set_trace()
+        # # TODO: delete these lines
+        # import pdb
+        # pdb.set_trace()
 
     def update(self, x, y, heading, real_walls):
 
@@ -140,7 +142,8 @@ class Terrain:
 
         # Change visual representation of direction (to draw it correctly)
         if self.last_visited_cell is not None \
-                and self.last_visited_cell != cell:
+                and self.last_visited_cell != cell \
+                and self.last_visited_cell.visited is not 'x':
             self.last_visited_cell.visited = '*'
 
         # Set last visited cell to this cell
@@ -291,6 +294,11 @@ class Terrain:
                             location = [new_x, new_y]
                             self.cells_to_check.append(location)
 
+                        # new_cell = self.grid[new_x][new_y]
+                        # if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
+                        #     location = [new_x, new_y]
+                        #     self.cells_to_check.append(location)
+
     def reset_visited_flags(self):
         for x in range(self.maze_dim):
             for y in range(self.maze_dim):
@@ -336,32 +344,6 @@ class Terrain:
             new_y = y - 1
             value = walls[down]
             self.set_value_of_wall(new_x, new_y, value, index, type_of_wall)
-
-        # # Left
-        # if self.is_valid_location(x - 1, y):
-        #     self.grid[x - 1][y].real_walls[] = real_walls[0]
-        #     self.grid[x - 1][y].imaginary_walls[opposite_wall['0']] = \
-        #         imaginary_walls[0]
-        #
-        # # Up
-        # if self.is_valid_location(x, y + 1):
-        #     self.grid[x][y + 1].real_walls[opposite_wall['1']] = real_walls[1]
-        #     self.grid[x][y + 1].imaginary_walls[opposite_wall['1']] = \
-        #         imaginary_walls[1]
-        #
-        # # Right
-        # if self.is_valid_location(x + 1, y):
-        #     self.grid[x + 1][y].real_walls[opposite_wall['2']] = real_walls[2]
-        #     self.grid[x + 1][y].imaginary_walls[opposite_wall['2']] = \
-        #         imaginary_walls[2]
-        #
-        # # Down
-        # if self.is_valid_location(x, y - 1):
-        #     self.grid[x][y - 1].real_walls[opposite_wall['3']] = real_walls[3]
-        #     self.grid[x][y - 1].imaginary_walls[opposite_wall['3']] = \
-        #         imaginary_walls[3]
-
-
 
     def set_value_of_wall(self, x, y, value, index, type_of_wall):
 
