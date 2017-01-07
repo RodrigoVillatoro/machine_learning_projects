@@ -1,7 +1,7 @@
 from cell import Cell
 
 dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
-               'up': 'd', 'right': 'l', 'down`': 'u', 'left': 'r'}
+               'up': 'd', 'right': 'l', 'down': 'u', 'left': 'r'}
 
 dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
@@ -16,7 +16,7 @@ opposite_wall = {'0': 2, '1': 3, '2': 0, '3': 1}
 index_walls = {'l': 0, 'u': 1, 'r': 2, 'd': 3,
                'left': 0, 'up': 1, 'right': 2, 'down': 3}
 
-WALL_VALUE = 99
+WALL_VALUE = 10000
 
 
 class Terrain:
@@ -26,6 +26,7 @@ class Terrain:
         self.fill_distances()
         self.last_visited_cell = None
         self.cells_to_check = []
+        self.visited_before_reaching_destination = []
 
     def fill_distances(self):
         """
@@ -194,7 +195,7 @@ class Terrain:
         if direction == 'd' or direction == 'down':
             return self.grid[x][y - 1].visited
 
-    def get_adjacent_distances(self, x, y, heading, last_movement, sensors):
+    def get_adjacent_distances(self, x, y, heading, sensors):
 
         # Placeholder (robot's coordinates)
         distances = [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
@@ -207,11 +208,9 @@ class Terrain:
                 visited[i] = self.get_visited(x, y, dir_sensor)
 
         # Update missing distance (cell right behind the robot)
-        # This is only valid if the last step was not rotation or reverse
-        if last_movement != 0 and last_movement != -1:
-            behind = dir_reverse[heading]
-            distances[3] = self.get_distance(x, y, behind)
-            visited[3] = self.get_visited(x, y, behind)
+        behind = dir_reverse[heading]
+        distances[3] = self.get_distance(x, y, behind)
+        visited[3] = self.get_visited(x, y, behind)
 
         return distances, visited
 
@@ -241,7 +240,8 @@ class Terrain:
                     new_x = x
                     new_y = y - 1
 
-                distances[i] = self.grid[new_x][new_y].distance
+                if self.is_valid_location(new_x, new_y):
+                    distances[i] = self.grid[new_x][new_y].distance
 
         return distances
 
@@ -288,16 +288,10 @@ class Terrain:
                             new_x = x
                             new_y = y - 1
 
-                        # Add to stack only if location has been visited
                         new_cell = self.grid[new_x][new_y]
-                        if new_cell.visited != '' and new_cell.visited != 'x':
+                        if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
                             location = [new_x, new_y]
                             self.cells_to_check.append(location)
-
-                        # new_cell = self.grid[new_x][new_y]
-                        # if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
-                        #     location = [new_x, new_y]
-                        #     self.cells_to_check.append(location)
 
     def reset_visited_flags(self):
         for x in range(self.maze_dim):
@@ -353,3 +347,61 @@ class Terrain:
         elif type_of_wall == 'imaginary':
             self.grid[x][y].imaginary_walls[index] = value
 
+    def set_imaginary_walls_for_unvisited_cells(self):
+        for x in range(self.maze_dim):
+            for y in range(self.maze_dim):
+                cell = self.grid[x][y]
+                if cell.visited == '':
+                    cell.distance = WALL_VALUE
+                    for i in range(4):
+                        cell.imaginary_walls[i] = 1
+
+    def update_distances_last_time(self):
+
+        cells_to_check = list(self.visited_before_reaching_destination)
+
+        # While stack is not empty
+        while len(cells_to_check) != 0:
+
+            # Update current cell and get it's distance
+            current_cell = cells_to_check.pop()
+            x = current_cell[0]
+            y = current_cell[1]
+            current_distance = self.grid[x][y].distance
+
+            # Get adjacent distances
+            adj_distances = self.get_adjacent_distances_visited_cells(x, y)
+
+            # Get the minimum
+            min_distance = min(adj_distances)
+
+            # If the cell we are standing on is not min_distance + 1
+            if current_distance != min_distance + 1 and current_distance != WALL_VALUE:
+
+                # First update this cell's distance
+                self.grid[x][y].distance = min_distance + 1
+
+                # Then push adjacent cells to the stack
+                for i, adj_distance in enumerate(adj_distances):
+                    if adj_distance != WALL_VALUE:
+                        # Left
+                        if i == 0:
+                            new_x = x - 1
+                            new_y = y
+                        # Up
+                        elif i == 1:
+                            new_x = x
+                            new_y = y + 1
+                        # Right
+                        elif i == 2:
+                            new_x = x + 1
+                            new_y = y
+                        # Down
+                        else:
+                            new_x = x
+                            new_y = y - 1
+
+                        new_cell = self.grid[new_x][new_y]
+                        if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
+                            location = [new_x, new_y]
+                            cells_to_check.append(location)

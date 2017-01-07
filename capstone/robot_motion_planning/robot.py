@@ -5,17 +5,18 @@ dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
                'up': ['l', 'u', 'r'], 'right': ['u', 'r', 'd'],
                'down': ['r', 'd', 'l'], 'left': ['d', 'l', 'u']}
+
 dir_move = {'u': [0, 1], 'r': [1, 0], 'd': [0, -1], 'l': [-1, 0],
             'up': [0, 1], 'right': [1, 0], 'down': [0, -1], 'left': [-1, 0]}
-dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
-               'up': 'd', 'right': 'l', 'down`': 'u', 'left': 'r'}
 
+dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
+               'up': 'd', 'right': 'l', 'down': 'u', 'left': 'r'}
 
 wall_index = {'l': 0, 'u': 1, 'r': 2, 'd': 3,
               'left': 0, 'up': 1, 'right': 2, 'down': 3}
 
 # Distance placeholder for walls
-WALL_VALUE = 99
+WALL_VALUE = 10000
 
 
 class Robot(object):
@@ -26,11 +27,9 @@ class Robot(object):
         provided based on common information, including the size of the maze
         the robot is placed in.
         '''
-        self.total_moves = 0  # Store total number of moves made by the robot
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}  # Current pos
         self.last_movement = 0  # 1 forward, -1 reverse, 0 if it only rotated
         self.reached_destination = False
-        self.round = 1
 
         # Goal
         center = maze_dim/2
@@ -38,18 +37,15 @@ class Robot(object):
             [center, center], [center - 1, center],
             [center, center - 1], [center - 1, center - 1]]
 
+        # Terrain
         self.terrain = Terrain(maze_dim)
 
-        # DEBUG:
+        # Debug
         self.terrain.draw()
 
     def reset_values(self):
-        # self.terrain.reset_visited_flags()
-        self.total_moves = 0
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
         self.last_movement = 0
-        self.reached_destination = False
-        self.round = 2
 
     def next_move(self, sensors):
         '''
@@ -74,74 +70,86 @@ class Robot(object):
         '''
 
         # Store direction and current location
-        heading = self.robot_pos['heading']
-        location = self.robot_pos['location']
-        x = location[0]
-        y = location[1]
+        x, y, heading = self.get_current_position()
 
         # If it's the starting position, just move forward
-        if location == [0, 0]:
+        if [x, y] == [0, 0]:
             rotation = 0
             movement = 1
             real_walls = [1, 0, 1, 1]
             self.store_last_movement(movement)
-            self.total_moves += 1
 
             # Update terrain
             self.terrain.update(x, y, heading, real_walls)
 
         # If we have reached the center of the maze
-        elif location in self.center_locations:
+        elif [x, y] in self.center_locations:
             # Set rotation and movement to 'Reset'
             rotation = 'Reset'
             movement = 'Reset'
 
-            # State that we have reached destination (used to update_location)
+            # Update terrain (visual representation)
+            real_walls = self.get_walls_for_current_location(x, y, heading, sensors)
+            self.terrain.update(x, y, heading, real_walls)
+
+            # State that we have reached destination
             self.reached_destination = True
+
+            self.terrain.set_imaginary_walls_for_unvisited_cells()
+            self.terrain.update_distances_last_time()
 
         # Else, first update distances, then get next move
         else:
 
             # 1) Push current location to stack
-            self.terrain.cells_to_check.append(location)
+            self.terrain.cells_to_check.append([x, y])
 
-            # 2) Add newly discovered walls
-            real_walls = self.get_walls_for_current_location(x, y, sensors)
+            # 2) Add current cell to stack of visited destinations
+            if not self.reached_destination:
+                self.terrain.visited_before_reaching_destination.append([x, y])
 
-            # 3) Update terrain and distances
+            # 3) Add newly discovered walls
+            real_walls = self.get_walls_for_current_location(x, y, heading, sensors)
+
+            # 4) Update terrain and distances
             self.terrain.update(x, y, heading, real_walls)
 
             # 4) Get next move
             rotation, movement = self.get_next_move(x, y, heading, sensors)
 
-        # # DEBUG:
-        # if rotation == 'Reset' or self.round == 2:
-        self.terrain.draw_double()
-        import pdb; pdb.set_trace()
-
         self.update_location(rotation, movement)
 
-        # If we have reached destination, reset visual flags for visited
+        # TODO: DELETE DEBUG
+        if self.reached_destination:
+            self.terrain.draw()
+            import pdb
+            pdb.set_trace()
+
+        # If we have reached destination, reset values
         if rotation == 'Reset' and movement == 'Reset':
             self.reset_values()
 
         return rotation, movement
 
-    def get_walls_for_current_location(self, x, y, sensors):
+    def get_current_position(self):
+        heading = self.robot_pos['heading']
+        location = self.robot_pos['location']
+        x = location[0]
+        y = location[1]
+        return x, y, heading
+
+    def get_walls_for_current_location(self, x, y, heading, sensors):
 
         # If it had been visited before, just get those values
         if self.terrain.grid[x][y].visited != '':
             walls = self.terrain.grid[x][y].get_total_walls()
 
-        # Else, get current walls. Note that it can only have real walls,
-        # Since the location has never been visited, and imaginary walls
-        # Are the result of dead ends that force the robot to the prev location
+        # Else, get current walls. Note that it can only have real walls
+        # since the location has never been visited, and imaginary walls
+        # are the result of dead ends that force the robot to the prev location
         else:
             # Placeholder
             walls = [0, 0, 0, 0]
-
-            # Store heading
-            heading = self.robot_pos['heading']
 
             # If Change sensor info to wall info
             walls_sensors = [1 if x == 0 else 0 for x in sensors]
@@ -155,12 +163,6 @@ class Robot(object):
             # Update missing wall index (the cell right behind the robot)
             index = wall_index[dir_reverse[heading]]
             walls[index] = 0
-
-            # # Include imaginary walls in walls
-            # imaginary_walls = self.terrain.grid[x][y].imaginary_walls
-            # for i in range(len(walls)):
-            #     if walls[i] == 1 or imaginary_walls[i] == 1:
-            #         walls[i] = 1
 
         return walls
 
@@ -191,11 +193,11 @@ class Robot(object):
                 dir_move[self.robot_pos['heading']][1]
 
         # If we have reached the destination reset location and heading
-        if self.reached_destination:
-            self.reset_values()
+        # if self.reached_destination:
+        #     self.reset_values()
 
     def number_of_walls(self, sensors):
-        number_of_walls  = 0
+        number_of_walls = 0
         for sensor in sensors:
             if sensor == 0:
                 number_of_walls += 1
@@ -220,6 +222,7 @@ class Robot(object):
 
             # 4) Change the value of visited to signify dead end
             cell.visited = 'x'
+            cell.distance = WALL_VALUE
 
             # 5) Update imaginary walls and distances
             self.terrain.update_imaginary_walls(x, y, cell.imaginary_walls)
@@ -227,26 +230,25 @@ class Robot(object):
         else:
 
             # 1) Get adjacent distances from sensors
-            adj_distances, adj_visited = self.terrain.get_adjacent_distances(x, y, heading, self.last_movement, sensors)
+            adj_distances, adj_visited = self.terrain.get_adjacent_distances(x, y, heading, sensors)
 
-            # 2) Get the minimum distance and index of that distance
-            min_distance = min(adj_distances)
-            min_indexes = [i for i, x in enumerate(adj_distances) if x == min_distance]
+            # Get min index (guaranteed to not be a wall)
+            min_index = adj_distances.index(min(adj_distances))
 
-            # If it's the first round, prefer unexplored cells
-            # Get the first unvisited index, or the first if all are visited
-            min_index = min_indexes[0]
-            if self.round == 1:
-                for i in range(len(min_indexes)):
-                    if adj_visited[i] is '':
-                        min_index = min_indexes[i]
-                        break
-            # If it's the second round, prefer explored cells
+            # If we have reached the destination, follow only visited
+            valid_distances = []
+            if self.reached_destination:
+                for i, dist in enumerate(adj_distances[0:3]):
+                    if dist != WALL_VALUE and adj_visited[i] is '*':
+                        valid_distances.append(dist)
+            # If it's the first round, prefer cells that have not been visited
             else:
-                for i in range(len(min_indexes)):
-                    if adj_visited[i] is not '':
-                        min_index = min_indexes[i]
-                        break
+                for i, dist in enumerate(adj_distances):
+                    if dist != WALL_VALUE and adj_visited[i] is '':
+                        valid_distances.append(dist)
+
+            if valid_distances:
+                min_index = adj_distances.index(min(valid_distances))
 
             # 3) Use that information to make a decision
             # Move Left
@@ -275,6 +277,5 @@ class Robot(object):
         Take note if the last step was only a rotation
         """
         self.last_movement = movement
-        self.total_moves += 1
 
 

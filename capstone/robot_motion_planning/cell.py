@@ -1,3 +1,6 @@
+WALL_VALUE = 10000
+
+
 class Cell:
 
     def __init__(self, real_walls=None, distance=0, visited=''):
@@ -48,7 +51,10 @@ class Cell:
         visited). Used to print the maze.
         :return: str with the second line that will visually represent a cell
         """
-        distance = str(self.distance)
+        if self.distance == WALL_VALUE:
+            distance = str(-1)
+        else:
+            distance = str(self.distance)
         cell = ''
         if self.real_walls[0]:
             cell += '|'
@@ -148,14 +154,15 @@ class Cell:
 
         return cell
 
-    def draw_cell(self):
+    def __str__(self):
         """
-        Draws an individual cell, not used in the print_maze function.
+        Returns an individual cell, not used in the print_maze function.
         """
-        cell = ''
-        cell += self.top()
+        cell = '\n'
+        cell += self.top_double()
         cell += '\n'
-        cell += self.middle()
+        cell += self.middle_double()
         cell += '\n'
-        cell += self.bottom()
-        print(cell)
+        cell += self.bottom_double()
+        cell += '\n'
+        return cell
