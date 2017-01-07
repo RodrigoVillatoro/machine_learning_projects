@@ -1,4 +1,4 @@
-WALL_VALUE = 10000
+from global_variables import WALL_VALUE
 
 
 class Cell:
