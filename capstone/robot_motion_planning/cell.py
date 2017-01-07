@@ -92,6 +92,8 @@ class Cell:
         cell = '+'
         if self.real_walls[1]:
             cell += ' --- '
+        elif self.imaginary_walls[1]:
+            cell += ' ... '
         else:
             cell += '     '
         cell += '+'
@@ -108,6 +110,8 @@ class Cell:
         cell = ''
         if self.real_walls[0]:
             cell += '|'
+        elif self.imaginary_walls[0]:
+            cell += ':'
         else:
             cell += ' '
         cell += ' '
@@ -120,6 +124,8 @@ class Cell:
         cell += ' '
         if self.real_walls[2]:
             cell += '|'
+        elif self.imaginary_walls[2]:
+            cell += ':'
         else:
             cell += ' '
 
@@ -134,6 +140,8 @@ class Cell:
         cell = '+'
         if self.real_walls[3]:
             cell += ' --- '
+        elif self.imaginary_walls[3]:
+            cell += ' ... '
         else:
             cell += '     '
         cell += '+'
