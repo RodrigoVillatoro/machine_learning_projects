@@ -6,26 +6,23 @@ from terrain import Terrain
 class Robot(object):
     def __init__(self, maze_dim):
         '''
-        Use the initialization function to set up attributes that your robot
-        will use to learn and navigate the maze. Some initial attributes are
-        provided based on common information, including the size of the maze
-        the robot is placed in.
+        Used to set up attributes that the robot will use to learn and
+        navigate the maze.
         '''
+
+        # Position-related attributes
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}  # Current pos
         self.last_movement = 0  # 1 forward, -1 reverse, 0 if it only rotated
-        self.reached_destination = False
 
-        # Goal
+        # Goal-related attributes
         center = maze_dim/2
         self.center_locations = [
             [center, center], [center - 1, center],
             [center, center - 1], [center - 1, center - 1]]
+        self.reached_destination = False
 
-        # Terrain
+        # Initialize terrain
         self.terrain = Terrain(maze_dim)
-
-        # Debug
-        self.terrain.draw()
 
     def reset_values(self):
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
@@ -53,34 +50,30 @@ class Robot(object):
         the tester to end the run and return the robot to the start.
         '''
 
-        # Store direction and current location
+        # Store current location and direction
         x, y, heading = self.get_current_position()
 
-        # If it's the starting position, just move forward
-        if [x, y] == [0, 0]:
-            rotation = 0
-            movement = 1
-            real_walls = [1, 0, 1, 1]
-            self.store_last_movement(movement)
-
-            # Update terrain
-            self.terrain.update(x, y, heading, real_walls)
+        # Get walls for current location
+        walls = self.get_walls_for_current_location(x, y, heading, sensors)
 
         # If we have reached the center of the maze
-        elif [x, y] in self.center_locations:
+        if self.is_at_center_of_the_maze(x, y):
             # Set rotation and movement to 'Reset'
             rotation = 'Reset'
             movement = 'Reset'
 
             # Update terrain (visual representation)
-            real_walls = self.get_walls_for_current_location(x, y, heading, sensors)
-            self.terrain.update(x, y, heading, real_walls)
+            self.terrain.update(x, y, heading, walls)
 
             # State that we have reached destination
             self.reached_destination = True
 
+            self.terrain.draw()
+
             self.terrain.set_imaginary_walls_for_unvisited_cells()
             self.terrain.update_distances_last_time()
+
+            self.terrain.draw()
 
         # Else, first update distances, then get next move
         else:
@@ -92,22 +85,13 @@ class Robot(object):
             if not self.reached_destination:
                 self.terrain.visited_before_reaching_destination.append([x, y])
 
-            # 3) Add newly discovered walls
-            real_walls = self.get_walls_for_current_location(x, y, heading, sensors)
-
             # 4) Update terrain and distances
-            self.terrain.update(x, y, heading, real_walls)
+            self.terrain.update(x, y, heading, walls)
 
             # 4) Get next move
             rotation, movement = self.get_next_move(x, y, heading, sensors)
 
         self.update_location(rotation, movement)
-
-        # TODO: DELETE DEBUG
-        if self.reached_destination:
-            self.terrain.draw()
-            import pdb
-            pdb.set_trace()
 
         # If we have reached destination, reset values
         if rotation == 'Reset' and movement == 'Reset':
@@ -122,10 +106,22 @@ class Robot(object):
         y = location[1]
         return x, y, heading
 
+    def is_at_starting_position(self, x, y):
+        return x == 0 and y == 0
+
+    def is_at_center_of_the_maze(self, x, y):
+        return [x, y] in self.center_locations
+
+    def is_at_a_dead_end(self, sensors):
+        return sensors == [0, 0, 0]
+
     def get_walls_for_current_location(self, x, y, heading, sensors):
 
+        if self.is_at_starting_position(x, y):
+            walls = [1, 0, 1, 1]
+
         # If it had been visited before, just get those values
-        if self.terrain.grid[x][y].visited != '':
+        elif self.terrain.grid[x][y].visited != '':
             walls = self.terrain.grid[x][y].get_total_walls()
 
         # Else, get current walls. Note that it can only have real walls
@@ -135,7 +131,7 @@ class Robot(object):
             # Placeholder
             walls = [0, 0, 0, 0]
 
-            # If Change sensor info to wall info
+            # Change sensor info to wall info
             walls_sensors = [1 if x == 0 else 0 for x in sensors]
 
             # Map walls to correct x and y coordinates
@@ -159,10 +155,6 @@ class Robot(object):
         elif rotation == 90:
             self.robot_pos['heading'] = \
                 dir_sensors[self.robot_pos['heading']][2]
-        elif rotation == 0:
-            pass
-        else:
-            print "Invalid rotation value, no rotation performed."
 
         # Advance
         if movement == 1:
@@ -176,10 +168,6 @@ class Robot(object):
             self.robot_pos['location'][1] -= \
                 dir_move[self.robot_pos['heading']][1]
 
-        # If we have reached the destination reset location and heading
-        # if self.reached_destination:
-        #     self.reset_values()
-
     def number_of_walls(self, sensors):
         number_of_walls = 0
         for sensor in sensors:
@@ -189,8 +177,12 @@ class Robot(object):
 
     def get_next_move(self, x, y, heading, sensors):
 
+        if self.is_at_starting_position(x, y):
+            rotation = 0
+            movement = 1
+
         # If we reach a dead end:
-        if sensors == [0, 0, 0] or (self.number_of_walls(sensors) == 2 and self.last_movement == -1):
+        elif self.is_at_a_dead_end(sensors):
 
             # 1) Move back one step
             rotation = 0
@@ -257,9 +249,6 @@ class Robot(object):
         return rotation, movement
 
     def store_last_movement(self, movement):
-        """
-        Take note if the last step was only a rotation
-        """
         self.last_movement = movement
 
 

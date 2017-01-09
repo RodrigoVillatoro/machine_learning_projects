@@ -4,6 +4,11 @@ from global_variables import (dir_reverse, dir_sensors, index_walls,
 
 
 class Terrain:
+    """
+    Used by the robot to create a visual representation of the maze.
+    It contains all the logic for the movement (fill maze, update distances,
+    etc) as well as methods for debugging the program (i.e. printing the maze).
+    """
     def __init__(self, maze_dim):
         self.maze_dim = maze_dim
         self.grid = [[Cell() for i in range(maze_dim)] for j in range(maze_dim)]
@@ -14,7 +19,8 @@ class Terrain:
 
     def fill_distances(self):
         """
-        Fills initial distances of the maze, assuming there are no walls.
+        Fills initial distances of the maze assuming there are no walls.
+        It's the 1st step of the flood fill algorithm, used to guide the robot.
         """
         center = self.maze_dim / 2
         max_distance = self.maze_dim - 2
@@ -44,79 +50,13 @@ class Terrain:
             for j in range(center + 1, self.maze_dim):
                 self.grid[i][j].distance = self.grid[i][j - 1].distance + 1
 
-    def print_row_of_cells(self, cells, include_delimiters=True):
-        """
-        Prints a single row of cells.
-        :param cells: array or cells of the same y position
-        :param include_delimiters: false to prevent duplicate walls
-        """
-        if include_delimiters:
-            top = ''
-            middle = '\n'
-            bottom = '\n'
-            for cell in cells:
-                top += cell.top()
-                middle += cell.middle()
-                bottom += cell.bottom()
-            result = top + middle + bottom
-        else:
-            middle = ''
-            for cell in cells:
-                middle += cell.middle()
-            result = middle
-
-        print(result)
-
-    def print_row_of_cells_double(self, cells):
-        top = ''
-        middle = '\n'
-        bottom = '\n'
-        for cell in cells:
-            top += cell.top_double()
-            middle += cell.middle_double()
-            bottom += cell.bottom_double()
-        result = top + middle + bottom
-        print(result)
-
-    def draw(self):
-        """
-        Print maze with correct x and y axes
-        """
-        mod_terrain = []
-        for i in range(self.maze_dim):
-            mod_terrain.append([x[i] for x in self.grid])
-
-        print_delimiters = True
-        for i, row in enumerate(reversed(mod_terrain)):
-            self.print_row_of_cells(row, print_delimiters)
-            print_delimiters = not print_delimiters  # Flip value
-
-        # # TODO: delete these lines
-        # import pdb
-        # pdb.set_trace()
-
-    def draw_double(self):
-        """
-        Print maze with correct x and y axes
-        """
-        mod_terrain = []
-        for i in range(self.maze_dim):
-            mod_terrain.append([x[i] for x in self.grid])
-
-        for i, row in enumerate(reversed(mod_terrain)):
-            self.print_row_of_cells_double(row)
-
-        # # TODO: delete these lines
-        # import pdb
-        # pdb.set_trace()
-
     def update(self, x, y, heading, real_walls):
 
         # Get reference to current position
         cell = self.grid[x][y]
 
-        # Store real_walls only if cell has not been visited (can't change)
-        # Imaginary walls can't change; walls are updated before location
+        # Store real_walls only if cell has not been visited.
+        # Imaginary walls can't change; walls are updated before location.
         if cell.visited == '':
             cell.real_walls = real_walls
             # Set adjacent walls (i.e. right wall of cell A is left wall of B)
@@ -165,7 +105,7 @@ class Terrain:
         if direction == 'd' or direction == 'down':
             return self.grid[x][y - 1].distance
 
-    def get_visited(self, x, y, direction):
+    def get_visited_flag(self, x, y, direction):
         # Left
         if direction == 'l' or direction == 'left':
             return self.grid[x - 1][y].visited
@@ -189,12 +129,12 @@ class Terrain:
             if sensors[i] != 0:
                 dir_sensor = dir_sensors[heading][i]
                 distances[i] = self.get_distance(x, y, dir_sensor)
-                visited[i] = self.get_visited(x, y, dir_sensor)
+                visited[i] = self.get_visited_flag(x, y, dir_sensor)
 
         # Update missing distance (cell right behind the robot)
         behind = dir_reverse[heading]
         distances[3] = self.get_distance(x, y, behind)
-        visited[3] = self.get_visited(x, y, behind)
+        visited[3] = self.get_visited_flag(x, y, behind)
 
         return distances, visited
 
@@ -389,3 +329,65 @@ class Terrain:
                         if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
                             location = [new_x, new_y]
                             cells_to_check.append(location)
+
+    ###############################
+    # FOR DEBUGGING
+    ###############################
+
+    def print_row_of_cells(self, cells, include_delimiters=True):
+        """
+        Prints a single row of cells.
+        :param cells: array or cells of the same y position
+        :param include_delimiters: false to prevent duplicate walls
+        """
+        if include_delimiters:
+            top = ''
+            middle = '\n'
+            bottom = '\n'
+            for cell in cells:
+                top += cell.top()
+                middle += cell.middle()
+                bottom += cell.bottom()
+            result = top + middle + bottom
+        else:
+            middle = ''
+            for cell in cells:
+                middle += cell.middle()
+            result = middle
+
+        print(result)
+
+    def print_row_of_cells_double(self, cells):
+        top = ''
+        middle = '\n'
+        bottom = '\n'
+        for cell in cells:
+            top += cell.top_double()
+            middle += cell.middle_double()
+            bottom += cell.bottom_double()
+        result = top + middle + bottom
+        print(result)
+
+    def draw(self):
+        """
+        Print maze with correct x and y axes
+        """
+        mod_terrain = []
+        for i in range(self.maze_dim):
+            mod_terrain.append([x[i] for x in self.grid])
+
+        print_delimiters = True
+        for i, row in enumerate(reversed(mod_terrain)):
+            self.print_row_of_cells(row, print_delimiters)
+            print_delimiters = not print_delimiters  # Flip value
+
+    def draw_double(self):
+        """
+        Print maze with correct x and y axes. Include all walls.
+        """
+        mod_terrain = []
+        for i in range(self.maze_dim):
+            mod_terrain.append([x[i] for x in self.grid])
+
+        for i, row in enumerate(reversed(mod_terrain)):
+            self.print_row_of_cells_double(row)
