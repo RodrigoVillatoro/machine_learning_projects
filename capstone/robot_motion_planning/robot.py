@@ -21,6 +21,10 @@ class Robot(object):
             [center, center - 1], [center - 1, center - 1]]
         self.reached_destination = False
 
+        # For exploring state
+        self.exploring = False
+        self.number_of_steps_exploring = 0
+
         # Initialize terrain
         self.terrain = Terrain(maze_dim)
 
@@ -58,22 +62,19 @@ class Robot(object):
 
         # If we have reached the center of the maze
         if self.is_at_center_of_the_maze(x, y):
-            # Set rotation and movement to 'Reset'
-            rotation = 'Reset'
-            movement = 'Reset'
+
+            # Move backwards
+            rotation = 0
+            movement = -1
 
             # Update terrain (visual representation)
-            self.terrain.update(x, y, heading, walls)
+            self.terrain.update(x, y, heading, walls, self.exploring)
 
             # State that we have reached destination
             self.reached_destination = True
 
-            self.terrain.draw()
-
-            self.terrain.set_imaginary_walls_for_unvisited_cells()
-            self.terrain.update_distances_last_time()
-
-            self.terrain.draw()
+            # Set flags to exploring
+            self.exploring = True
 
         # Else, first update distances, then get next move
         else:
@@ -82,14 +83,17 @@ class Robot(object):
             self.terrain.cells_to_check.append([x, y])
 
             # 2) Add current cell to stack of visited destinations
-            if not self.reached_destination:
+            if [x, y] not in self.terrain.visited_before_reaching_destination:
                 self.terrain.visited_before_reaching_destination.append([x, y])
 
             # 4) Update terrain and distances
-            self.terrain.update(x, y, heading, walls)
+            self.terrain.update(x, y, heading, walls, self.exploring)
 
             # 4) Get next move
-            rotation, movement = self.get_next_move(x, y, heading, sensors)
+            if self.reached_destination and self.exploring:
+                rotation, movement = self.explore(x, y, heading, sensors)
+            else:
+                rotation, movement = self.get_next_move(x, y, heading, sensors)
 
         self.update_location(rotation, movement)
 
@@ -113,7 +117,9 @@ class Robot(object):
         return [x, y] in self.center_locations
 
     def is_at_a_dead_end(self, sensors):
-        return sensors == [0, 0, 0]
+        x, y, heading = self.get_current_position()
+        adj_distances, adj_visited = self.terrain.get_adjacent_distances(x, y, heading, sensors, False)
+        return sensors == [0, 0, 0] or adj_distances == [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
 
     def get_walls_for_current_location(self, x, y, heading, sensors):
 
@@ -215,7 +221,7 @@ class Robot(object):
             valid_distances = []
             if self.reached_destination:
                 for i, dist in enumerate(adj_distances[0:3]):
-                    if dist != WALL_VALUE and adj_visited[i] is '*':
+                    if dist != WALL_VALUE and adj_visited[i] is '*' or adj_visited[i] is 'e':
                         valid_distances.append(dist)
             # If it's the first round, prefer cells that have not been visited
             else:
@@ -248,7 +254,179 @@ class Robot(object):
 
         return rotation, movement
 
+    def explore(self, x, y, heading, sensors):
+
+        if self.should_end_exploring(x, y):
+            rotation = 'Reset'
+            movement = 'Reset'
+            self.exploring = False
+            self.terrain.set_imaginary_walls_for_unvisited_cells()
+            self.terrain.update_distances_last_time()
+
+            self.terrain.draw()
+            explored = self.terrain.get_percentage_of_maze_explored()
+            print(explored)
+
+        else:
+
+            # If we reach a dead end:
+            if self.is_at_a_dead_end(sensors):
+
+                # 1) Move back one step
+                rotation = 0
+                movement = -1
+
+                # 2) Get reference to cell
+                cell = self.terrain.grid[x][y]
+
+                # 3) Place imaginary wall behind the robot before exiting location
+                reverse_direction = dir_reverse[heading]
+                index = self.terrain.get_index_of_wall(reverse_direction)
+                cell.imaginary_walls[index] = 1
+
+                # 4) Change the value of visited to signify dead end
+                cell.visited = 'x'
+                cell.distance = WALL_VALUE
+
+                # 5) Update imaginary walls and distances
+                self.terrain.update_imaginary_walls(x, y, cell.imaginary_walls)
+
+            else:
+
+                # 1) Get adjacent distances from sensors
+                adj_distances, adj_visited = self.terrain.get_adjacent_distances(x, y, heading, sensors)
+
+                # Convert wall values to -1 (robot will follow max distance, can't be wall)
+                adj_distances = [-1 if dist == WALL_VALUE else dist for dist in adj_distances]
+
+                # Get max index (guaranteed to not be a wall)
+                valid_distance = max(adj_distances)
+                # valid_index = adj_distances.index(valid_distance)
+                valid_index = None
+
+                # Prefer cells that have not been visited
+                for i, dist in enumerate(adj_distances):
+                    if dist != -1 and adj_visited[i] is '':
+                        valid_index = i
+                        break
+
+                if valid_index is None:
+                    possible_candidate = None
+                    for i, dist in enumerate(adj_distances):
+                        if dist != -1 and adj_visited[i] is '*':
+                            if possible_candidate is None:
+                                possible_candidate = i
+                            else:
+                                a = adj_distances[possible_candidate]
+                                b = adj_distances[i]
+                                if b > a:
+                                    possible_candidate = i
+
+                    valid_index = possible_candidate
+
+                if valid_index is None:
+                    possible_candidate = None
+                    for i, dist in enumerate(adj_distances):
+                        if dist != -1 and adj_visited[i] is 'e':
+                            if possible_candidate is None:
+                                possible_candidate = i
+                            else:
+                                a = adj_distances[possible_candidate]
+                                b = adj_distances[i]
+                                if b > a:
+                                    possible_candidate = i
+
+                    valid_index = possible_candidate
+
+                # 3) Use that information to make a decision
+                # Move Left
+                if valid_index == 0:
+                    rotation = -90
+                    movement = 1
+                # Move Up
+                elif valid_index == 1:
+                    rotation = 0
+                    movement = 1
+                # Move Right
+                elif valid_index == 2:
+                    rotation = 90
+                    movement = 1
+                # Minimum distance is behind, so just rotate clockwise
+                else:
+                    rotation = 90
+                    movement = 0
+
+            self.store_last_movement(movement)
+            self.number_of_steps_exploring += 1
+
+        return rotation, movement
+
     def store_last_movement(self, movement):
         self.last_movement = movement
+
+    def should_end_exploring(self, x, y):
+
+        # Check for % of cells covered
+        if self.terrain.get_percentage_of_maze_explored() > 90:
+            return True
+
+        # Check for number of steps
+        if self.number_of_steps_exploring > 30:
+            return True
+
+        # Check for center of the maze:
+        if self.is_at_center_of_the_maze(x, y):
+            return True
+
+        if self.is_at_starting_position(x, y):
+            return True
+
+        return False
+
+    def get_optimal_number_of_moves(self, x, y, heading, sensors):
+
+        # 1) Get adjacent distances from sensors
+        adj_distances, adj_visited = self.terrain.get_adjacent_distances(x, y, heading, sensors)
+
+        # Get min index (guaranteed to not be a wall)
+        min_index = adj_distances.index(min(adj_distances))
+
+        # If we have reached the destination, follow only visited
+        valid_distances = []
+        if self.reached_destination:
+            for i, dist in enumerate(adj_distances[0:3]):
+                if dist != WALL_VALUE and adj_visited[i] is '*' or adj_visited[i] is 'e':
+                    valid_distances.append(dist)
+        # If it's the first round, prefer cells that have not been visited
+        else:
+            for i, dist in enumerate(adj_distances):
+                if dist != WALL_VALUE and adj_visited[i] is '':
+                    valid_distances.append(dist)
+
+        if valid_distances:
+            min_index = adj_distances.index(min(valid_distances))
+
+        # 3) Use that information to make a decision
+        # Move Left
+        if min_index == 0:
+            rotation = -90
+            movement = 1
+        # Move Up
+        elif min_index == 1:
+            rotation = 0
+            movement = 1
+        # Move Right
+        elif min_index == 2:
+            rotation = 90
+            movement = 1
+        # Minimum distance is behind, so just rotate clockwise
+        else:
+            rotation = 90
+            movement = 0
+
+        self.store_last_movement(movement)
+
+        return rotation, movement
+
 
 

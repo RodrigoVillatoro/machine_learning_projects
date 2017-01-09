@@ -1,6 +1,6 @@
 from cell import Cell
-from global_variables import (dir_reverse, dir_sensors, index_walls,
-                              opposite_wall, robot_directions, WALL_VALUE)
+from global_variables import (dir_reverse, dir_sensors, opposite_wall,
+                              robot_directions, wall_index, WALL_VALUE)
 
 
 class Terrain:
@@ -50,7 +50,7 @@ class Terrain:
             for j in range(center + 1, self.maze_dim):
                 self.grid[i][j].distance = self.grid[i][j - 1].distance + 1
 
-    def update(self, x, y, heading, real_walls):
+    def update(self, x, y, heading, real_walls, exploring):
 
         # Get reference to current position
         cell = self.grid[x][y]
@@ -68,8 +68,14 @@ class Terrain:
         # Change visual representation of direction (to draw it correctly)
         if self.last_visited_cell is not None \
                 and self.last_visited_cell != cell \
-                and self.last_visited_cell.visited is not 'x':
+                and self.last_visited_cell.visited is not 'x'\
+                and not exploring:
             self.last_visited_cell.visited = '*'
+        elif self.last_visited_cell is not None \
+                and self.last_visited_cell != cell \
+                and self.last_visited_cell.visited is not 'x' \
+                and exploring:
+            self.last_visited_cell.visited = 'e'
 
         # Set last visited cell to this cell
         self.last_visited_cell = cell
@@ -89,37 +95,69 @@ class Terrain:
         self.update_distances()
 
     def get_index_of_wall(self, direction):
-        return index_walls[direction]
+        return wall_index[direction]
 
     def get_distance(self, x, y, direction):
+        walls = self.grid[x][y].get_total_walls()
+
         # Left
         if direction == 'l' or direction == 'left':
-            return self.grid[x - 1][y].distance
+            if walls[wall_index['l']] == 1:
+                distance = WALL_VALUE
+            else:
+                distance = self.grid[x - 1][y].distance
         # Up
         if direction == 'u' or direction == 'up':
-            return self.grid[x][y + 1].distance
+            if walls[wall_index['u']] == 1:
+                distance = WALL_VALUE
+            else:
+                distance = self.grid[x][y + 1].distance
         # Right
         if direction == 'r' or direction == 'right':
-            return self.grid[x + 1][y].distance
+            if walls[wall_index['r']] == 1:
+                distance = WALL_VALUE
+            else:
+                distance = self.grid[x + 1][y].distance
         # Down
         if direction == 'd' or direction == 'down':
-            return self.grid[x][y - 1].distance
+            if walls[wall_index['d']] == 1:
+                distance = WALL_VALUE
+            else:
+                distance = self.grid[x][y - 1].distance
+
+        return distance
 
     def get_visited_flag(self, x, y, direction):
+        walls = self.grid[x][y].get_total_walls()
+
         # Left
         if direction == 'l' or direction == 'left':
-            return self.grid[x - 1][y].visited
+            if walls[wall_index['l']] == 1:
+                visited = ''
+            else:
+                visited = self.grid[x - 1][y].visited
         # Up
         if direction == 'u' or direction == 'up':
-            return self.grid[x][y + 1].visited
+            if walls[wall_index['u']] == 1:
+                visited = ''
+            else:
+                visited = self.grid[x][y + 1].visited
         # Right
         if direction == 'r' or direction == 'right':
-            return self.grid[x + 1][y].visited
+            if walls[wall_index['r']] == 1:
+                visited = ''
+            else:
+                visited = self.grid[x + 1][y].visited
         # Down
         if direction == 'd' or direction == 'down':
-            return self.grid[x][y - 1].visited
+            if walls[wall_index['d']] == 1:
+                visited = ''
+            else:
+                visited = self.grid[x][y - 1].visited
 
-    def get_adjacent_distances(self, x, y, heading, sensors):
+        return visited
+
+    def get_adjacent_distances(self, x, y, heading, sensors, get_behind=True):
 
         # Placeholder (robot's coordinates)
         distances = [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
@@ -132,9 +170,10 @@ class Terrain:
                 visited[i] = self.get_visited_flag(x, y, dir_sensor)
 
         # Update missing distance (cell right behind the robot)
-        behind = dir_reverse[heading]
-        distances[3] = self.get_distance(x, y, behind)
-        visited[3] = self.get_visited_flag(x, y, behind)
+        if get_behind:
+            behind = dir_reverse[heading]
+            distances[3] = self.get_distance(x, y, behind)
+            visited[3] = self.get_visited_flag(x, y, behind)
 
         return distances, visited
 
@@ -391,3 +430,8 @@ class Terrain:
 
         for i, row in enumerate(reversed(mod_terrain)):
             self.print_row_of_cells_double(row)
+
+    def get_percentage_of_maze_explored(self):
+        num_cells_in_maze = self.maze_dim * self.maze_dim
+        num_cells_explored = len(self.visited_before_reaching_destination)
+        return (num_cells_explored * 100) / num_cells_in_maze
