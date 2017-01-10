@@ -1,3 +1,5 @@
+import sys
+
 from global_variables import (dir_move, dir_reverse, dir_sensors, rotations,
                               wall_index, MAX_DISTANCES, WALL_VALUE)
 from terrain import Terrain
@@ -12,6 +14,9 @@ class Robot(object):
 
         # Position-related attributes
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}  # Current pos
+        self.steps_first_round = 0
+        self.steps_final_round = 0
+        self.maze_dim = maze_dim
 
         # Goal-related attributes
         center = maze_dim/2
@@ -22,10 +27,22 @@ class Robot(object):
 
         # For exploring state
         self.exploring = False
-        self.number_of_steps_exploring = 0
+        self.steps_exploring = 0
 
         # Initialize terrain
         self.terrain = Terrain(maze_dim)
+
+        # Algorithm to use:
+        if str(sys.argv[2]).lower() == 'ff':
+            self.algorithm = 'flood-fill'
+        elif str(sys.argv[2]).lower() == 'pr':
+            self.algorithm = 'prefer-right'
+
+        # Explore after reaching center of the maze:
+        if str(sys.argv[3]).lower() == 'true':
+            self.explore_after_center = True
+        elif str(sys.argv[3]).lower() == 'false':
+            self.explore_after_center = False
 
     def next_move(self, sensors):
         '''
@@ -93,6 +110,11 @@ class Robot(object):
         if rotation == 'Reset' and movement == 'Reset':
             self.reset_values()
 
+        # If we are about to hit the goal in the second round
+        if self.robot_pos['location'] in self.center_locations \
+                and self.steps_final_round != 0:
+            self.report_results()
+
         return rotation, movement
 
     def reset_values(self):
@@ -113,7 +135,8 @@ class Robot(object):
 
     def is_at_a_dead_end(self, sensors):
         x, y, heading = self.get_current_position()
-        adj_distances, adj_visited = self.terrain.get_adj_info(x, y, heading, sensors, False)
+        adj_distances, adj_visited = \
+            self.terrain.get_adj_info(x, y, heading, sensors, False)
         return sensors == [0, 0, 0] or adj_distances == list(MAX_DISTANCES)
 
     def get_walls_for_current_location(self, x, y, heading, sensors):
@@ -193,15 +216,51 @@ class Robot(object):
         return number_of_walls
 
     def get_next_move(self, x, y, heading, sensors):
+
         if self.reached_destination and self.exploring:
+
             # Explore
             rotation, movement = self.explore(x, y, heading, sensors)
+            self.steps_exploring += 1
+
         elif not self.reached_destination and not self.exploring:
+
             # First round (looking for center of the maze)
-            rotation, movement = self.first_round(x, y, heading, sensors)
+            if self.algorithm == 'flood-fill':
+                rotation, movement = self.first_round(x, y, heading, sensors)
+            else:
+                rotation, movement = self.always_right(x, y, heading, sensors)
+
+            self.steps_first_round += 1
+
         else:
             # Final round (optimized moved)
             rotation, movement = self.final_round(x, y, heading, sensors)
+            self.steps_final_round += 1
+
+        return rotation, movement
+
+    def always_right(self, x, y, heading, sensors):
+
+        if self.is_at_a_dead_end(sensors):
+            rotation, movement = self.deal_with_dead_end(x, y, heading)
+
+        else:
+
+            # 1) Get adjacent distances from sensors
+            adj_distances, adj_visited = self.terrain.get_adj_info(
+                x, y, heading, sensors)
+
+            if adj_distances[2] != WALL_VALUE and adj_visited[2] != '*':
+                valid_index = 2
+            elif adj_distances[1] != WALL_VALUE and adj_visited[1] != '*':
+                valid_index = 1
+            elif adj_distances[0] != WALL_VALUE and adj_visited[0] != '*':
+                valid_index = 0
+            else:
+                valid_index = adj_distances.index(min(adj_distances))
+
+            rotation, movement = self.convert_from_index(valid_index)
 
         return rotation, movement
 
@@ -254,7 +313,7 @@ class Robot(object):
             adj_distances, adj_visited = self.terrain.get_adj_info(
                 x, y, heading, sensors)
 
-            # Convert wall values to -1 (robot will follow max distance, can't be wall)
+            # Convert WALL_VALUES to -1 (robot will follow max distance)
             adj_distances = [-1 if dist == WALL_VALUE else dist for dist in
                              adj_distances]
 
@@ -299,7 +358,7 @@ class Robot(object):
 
     def explore(self, x, y, heading, sensors):
 
-        if self.should_end_exploring(x, y):
+        if self.should_end_exploring(x, y) or not self.explore_after_center:
             rotation = 'Reset'
             movement = 'Reset'
             self.exploring = False
@@ -315,8 +374,6 @@ class Robot(object):
             else:
                 valid_index = self.get_valid_index(x, y, heading, sensors, True)
                 rotation, movement = self.convert_from_index(valid_index)
-
-            self.number_of_steps_exploring += 1
 
         return rotation, movement
 
@@ -376,7 +433,7 @@ class Robot(object):
             return True
 
         # Check for number of steps
-        if self.number_of_steps_exploring > 30:
+        if self.steps_exploring > 30:
             return True
 
         # Check for center of the maze:
@@ -433,3 +490,17 @@ class Robot(object):
         return (adj_visited[i] is not ''
                 and adj_visited[i] is not 'x'
                 and adj_distances[i] is not WALL_VALUE)
+
+    def report_results(self):
+        distance = self.terrain.grid[0][0].distance
+        percentage = self.terrain.get_percentage_of_maze_explored()
+        first_round = self.steps_first_round + self.steps_exploring
+        final_round = self.steps_final_round
+        print('************ REPORT ************')
+        print('ALGORITHM USED: {}'.format(self.algorithm))
+        print('EXPLORING AFTER CENTER: {}'.format(self.explore_after_center))
+        print('NUMBER OF MOVES FIRST ROUND: {}'.format(first_round))
+        print('PERCENTAGE OF MAZE EXPLORED: {}%'.format(percentage))
+        print('DISTANCE TO CENTER: {}'.format(distance))
+        print('NUMBER OF MOVES FINAL ROUND: {}'.format(final_round))
+        print('********************************')
