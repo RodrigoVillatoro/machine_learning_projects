@@ -27,9 +27,6 @@ class Robot(object):
         # Initialize terrain
         self.terrain = Terrain(maze_dim)
 
-    def reset_values(self):
-        self.robot_pos = {'location': [0, 0], 'heading': 'up'}
-
     def next_move(self, sensors):
         '''
         Use this function to determine the next move the robot should make,
@@ -88,13 +85,7 @@ class Robot(object):
             self.terrain.update(x, y, heading, walls, self.exploring)
 
             # 4) Get next move
-            if self.reached_destination and self.exploring:
-                rotation, movement = self.explore(x, y, heading, sensors)
-            elif not self.reached_destination and not self.exploring:
-                rotation, movement = self.get_next_move(x, y, heading, sensors)
-            else:
-                # Final round
-                rotation, movement = self.get_optimal_moves(x, y, heading, sensors)
+            rotation, movement = self.get_next_move(x, y, heading, sensors)
 
         self.update_location(rotation, movement)
 
@@ -103,6 +94,9 @@ class Robot(object):
             self.reset_values()
 
         return rotation, movement
+
+    def reset_values(self):
+        self.robot_pos = {'location': [0, 0], 'heading': 'up'}
 
     def get_current_position(self):
         heading = self.robot_pos['heading']
@@ -198,7 +192,20 @@ class Robot(object):
                 number_of_walls += 1
         return number_of_walls
 
-    def get_next_move(self, x, y, heading, sensors, exploring=False):
+    def get_next_move(self, x, y, heading, sensors):
+        if self.reached_destination and self.exploring:
+            # Explore
+            rotation, movement = self.explore(x, y, heading, sensors)
+        elif not self.reached_destination and not self.exploring:
+            # First round (looking for center of the maze)
+            rotation, movement = self.first_round(x, y, heading, sensors)
+        else:
+            # Final round (optimized moved)
+            rotation, movement = self.final_round(x, y, heading, sensors)
+
+        return rotation, movement
+
+    def first_round(self, x, y, heading, sensors, exploring=False):
 
         if self.is_at_starting_position(x, y):
             rotation = 0
@@ -297,7 +304,7 @@ class Robot(object):
             movement = 'Reset'
             self.exploring = False
             self.terrain.set_imaginary_walls_for_unvisited_cells()
-            self.terrain.update_distances_last_time()
+            self.terrain.update_distances(last_update=True)
 
         else:
 
@@ -381,7 +388,7 @@ class Robot(object):
 
         return False
 
-    def get_optimal_moves(self, x, y, heading, sensors):
+    def final_round(self, x, y, heading, sensors):
         """
         Returns the correct rotation and maximum numbers of steps that
          the robot can take to optimize the score while staying on track

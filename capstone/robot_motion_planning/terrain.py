@@ -19,7 +19,7 @@ class Terrain:
         self.visited_before_reaching_destination = []
 
     # --------------------------------------------
-    # FLOOD-FILL ALGORITHM
+    # FOR FLOOD-FILL ALGORITHM
     # --------------------------------------------
 
     def fill_distances(self):
@@ -91,6 +91,11 @@ class Terrain:
         self.update_distances()
 
     def change_visual_representation_of_prev_cell(self, curr_cell, exploring):
+        """
+        All visited cells during exploration are marked with 'e'. All
+        other visited cells are marked with *, provided they are not the
+        current cell the robot is standing on, or the cell is not a dead end.
+        """
         if self.last_visited_cell is not None \
                 and self.last_visited_cell != curr_cell \
                 and self.last_visited_cell.visited is not 'x':
@@ -100,6 +105,10 @@ class Terrain:
                 self.last_visited_cell.visited = 'e'
 
     def update_imaginary_walls(self, x, y, imaginary_walls):
+        """
+        Adds adjacent imaginary walls, and updates distances of the maze
+        to account for the new found imaginary walls.
+        """
 
         # Get reference to current position
         cell = self.grid[x][y]
@@ -122,29 +131,25 @@ class Terrain:
             if walls[wall_index['l']] == 0 \
                     and self.is_valid_location(x - steps, y):
                 cell = self.grid[x - steps][y]
-                # distance = self.grid[x - steps][y].distance
-                distance = getattr(cell, 'distance')
+                distance = self.grid[x - steps][y].distance
         # Up
         if direction == 'u' or direction == 'up':
             if walls[wall_index['u']] == 0 \
                     and self.is_valid_location(x, y + steps):
                 cell = self.grid[x][y + steps]
-                # distance = self.grid[x][y + steps].distance
-                distance = getattr(cell, 'distance')
+                distance = self.grid[x][y + steps].distance
         # Right
         if direction == 'r' or direction == 'right':
             if walls[wall_index['r']] == 0 \
                     and self.is_valid_location(x + steps, y):
                 cell = self.grid[x + steps][y]
-                # distance = self.grid[x + steps][y].distance
-                distance = getattr(cell, 'distance')
+                distance = self.grid[x + steps][y].distance
         # Down
         if direction == 'd' or direction == 'down':
             if walls[wall_index['d']] == 0 \
                     and self.is_valid_location(x, y - steps):
                 cell = self.grid[x][y - steps]
-                # distance = self.grid[x][y - steps].distance
-                distance = getattr(cell, 'distance')
+                distance = self.grid[x][y - steps].distance
 
         return distance
 
@@ -177,13 +182,7 @@ class Terrain:
 
     def get_adj_info(self, x, y, heading, sensors, get_cell_behind=True):
         """
-        Returns adjacent distances in robot's coordinates
-        :param x: Current x position
-        :param y: Current y position
-        :param heading: Direction where robot is heading
-        :param sensors: Available spaces, as per sensors
-        :param get_behind: If we are interested in the value of the cell behind
-        :return: array of adjacent distances and if the cells have been visited
+        Returns adjacent distances and visited flags in robot's coordinates
         """
 
         distances = list(MAX_DISTANCES)
@@ -234,13 +233,18 @@ class Terrain:
 
         return distances
 
-    def update_distances(self):
+    def update_distances(self, last_update=False):
+
+        if last_update:
+            cells_to_check = list(self.visited_before_reaching_destination)
+        else:
+            cells_to_check = self.cells_to_check
 
         # While stack is not empty
-        while len(self.cells_to_check) != 0:
+        while len(cells_to_check) != 0:
 
             # Update current cell and get it's distance
-            current_cell = self.cells_to_check.pop()
+            current_cell = cells_to_check.pop()
             x = current_cell[0]
             y = current_cell[1]
             current_distance = self.grid[x][y].distance
@@ -252,7 +256,7 @@ class Terrain:
             min_distance = min(adj_distances)
 
             # If the cell we are standing on is not min_distance + 1
-            if current_distance != min_distance + 1:
+            if current_distance != min_distance + 1 and current_distance != WALL_VALUE:
 
                 # First update this cell's distance
                 self.grid[x][y].distance = min_distance + 1
@@ -278,7 +282,8 @@ class Terrain:
                             new_y = y - 1
 
                         new_cell = self.grid[new_x][new_y]
-                        if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
+                        if new_cell.visited != 'x' \
+                                and self.is_valid_location(new_x, new_y):
                             location = [new_x, new_y]
                             self.cells_to_check.append(location)
 
@@ -329,7 +334,9 @@ class Terrain:
             self.set_value_of_wall(new_x, new_y, value, index, type_of_wall)
 
     def set_value_of_wall(self, x, y, value, index, type_of_wall):
-
+        """
+        Sets the correct value of real an imaginary walls for a given cell
+        """
         if type_of_wall == 'real':
             self.grid[x][y].real_walls[index] = value
 
@@ -337,6 +344,11 @@ class Terrain:
             self.grid[x][y].imaginary_walls[index] = value
 
     def set_imaginary_walls_for_unvisited_cells(self):
+        """
+        Used when first round finished. It converts all unvisited values of
+         cells to -1 and places imaginary walls so distances can be updated
+         correctly and robot can follow a logical (safe) path to the center.
+        """
         for x in range(self.maze_dim):
             for y in range(self.maze_dim):
                 cell = self.grid[x][y]
@@ -344,56 +356,6 @@ class Terrain:
                     cell.distance = WALL_VALUE
                     for i in range(4):
                         cell.imaginary_walls[i] = 1
-
-    def update_distances_last_time(self):
-
-        cells_to_check = list(self.visited_before_reaching_destination)
-
-        # While stack is not empty
-        while len(cells_to_check) != 0:
-
-            # Update current cell and get it's distance
-            current_cell = cells_to_check.pop()
-            x = current_cell[0]
-            y = current_cell[1]
-            current_distance = self.grid[x][y].distance
-
-            # Get adjacent distances
-            adj_distances = self.get_adjacent_distances_visited_cells(x, y)
-
-            # Get the minimum
-            min_distance = min(adj_distances)
-
-            # If the cell we are standing on is not min_distance + 1
-            if current_distance != min_distance + 1 and current_distance != WALL_VALUE:
-
-                # First update this cell's distance
-                self.grid[x][y].distance = min_distance + 1
-
-                # Then push adjacent cells to the stack
-                for i, adj_distance in enumerate(adj_distances):
-                    if adj_distance != WALL_VALUE:
-                        # Left
-                        if i == 0:
-                            new_x = x - 1
-                            new_y = y
-                        # Up
-                        elif i == 1:
-                            new_x = x
-                            new_y = y + 1
-                        # Right
-                        elif i == 2:
-                            new_x = x + 1
-                            new_y = y
-                        # Down
-                        else:
-                            new_x = x
-                            new_y = y - 1
-
-                        new_cell = self.grid[new_x][new_y]
-                        if new_cell.visited != 'x' and self.is_valid_location(new_x, new_y):
-                            location = [new_x, new_y]
-                            cells_to_check.append(location)
 
     # --------------------------------------------
     # FOR DEBUGGING
@@ -435,7 +397,7 @@ class Terrain:
 
     def draw(self):
         """
-        Print maze with correct x and y axes
+        Prints maze with correct x and y axes.
         """
         mod_terrain = []
         for i in range(self.maze_dim):
@@ -448,7 +410,7 @@ class Terrain:
 
     def draw_double(self):
         """
-        Print maze with correct x and y axes. Include all walls.
+        Prints maze with correct x and y axes. Includes all walls.
         """
         mod_terrain = []
         for i in range(self.maze_dim):
