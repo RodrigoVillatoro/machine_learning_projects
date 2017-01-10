@@ -21,5 +21,13 @@ opposite_wall = {'0': 2, '1': 3, '2': 0, '3': 1}
 wall_index = {'l': 0, 'u': 1, 'r': 2, 'd': 3,
                'left': 0, 'up': 1, 'right': 2, 'down': 3}
 
+# Robot rotation (robot's coordinates)
+rotations = {
+    '0': -90,  # Left
+    '1': 0,  # Forward
+    '2': 90,  # Right
+}
+
 # Distance placeholder for walls
 WALL_VALUE = 10000
+MAX_DISTANCES = [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
