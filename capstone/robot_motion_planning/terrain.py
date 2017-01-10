@@ -97,69 +97,63 @@ class Terrain:
     def get_index_of_wall(self, direction):
         return wall_index[direction]
 
-    def get_distance(self, x, y, direction):
+    def get_distance(self, x, y, direction, steps=1):
         walls = self.grid[x][y].get_total_walls()
+        distance = WALL_VALUE
 
         # Left
         if direction == 'l' or direction == 'left':
-            if walls[wall_index['l']] == 1:
-                distance = WALL_VALUE
-            else:
-                distance = self.grid[x - 1][y].distance
+            if walls[wall_index['l']] == 0 and self.is_valid_location(x - steps, y):
+                distance = self.grid[x - steps][y].distance
         # Up
         if direction == 'u' or direction == 'up':
-            if walls[wall_index['u']] == 1:
-                distance = WALL_VALUE
-            else:
-                distance = self.grid[x][y + 1].distance
+            if walls[wall_index['u']] == 0 and self.is_valid_location(x, y + steps):
+                distance = self.grid[x][y + steps].distance
         # Right
         if direction == 'r' or direction == 'right':
-            if walls[wall_index['r']] == 1:
-                distance = WALL_VALUE
-            else:
-                distance = self.grid[x + 1][y].distance
+            if walls[wall_index['r']] == 0 and self.is_valid_location(x + steps, y):
+                distance = self.grid[x + steps][y].distance
         # Down
         if direction == 'd' or direction == 'down':
-            if walls[wall_index['d']] == 1:
-                distance = WALL_VALUE
-            else:
-                distance = self.grid[x][y - 1].distance
+            if walls[wall_index['d']] == 0 and self.is_valid_location(x, y - steps):
+                distance = self.grid[x][y - steps].distance
 
         return distance
 
-    def get_visited_flag(self, x, y, direction):
+    def get_visited_flag(self, x, y, direction, steps=1):
         walls = self.grid[x][y].get_total_walls()
+        visited = ''
 
         # Left
         if direction == 'l' or direction == 'left':
-            if walls[wall_index['l']] == 1:
-                visited = ''
-            else:
-                visited = self.grid[x - 1][y].visited
+            if walls[wall_index['l']] == 0 and self.is_valid_location(x - steps, y):
+                visited = self.grid[x - steps][y].visited
         # Up
         if direction == 'u' or direction == 'up':
-            if walls[wall_index['u']] == 1:
-                visited = ''
-            else:
-                visited = self.grid[x][y + 1].visited
+            if walls[wall_index['u']] == 0 and self.is_valid_location(x, y + steps):
+                visited = self.grid[x][y + steps].visited
         # Right
         if direction == 'r' or direction == 'right':
-            if walls[wall_index['r']] == 1:
-                visited = ''
-            else:
-                visited = self.grid[x + 1][y].visited
+            if walls[wall_index['r']] == 0 and self.is_valid_location(x + steps, y):
+                visited = self.grid[x + steps][y].visited
         # Down
         if direction == 'd' or direction == 'down':
-            if walls[wall_index['d']] == 1:
-                visited = ''
-            else:
-                visited = self.grid[x][y - 1].visited
+            if walls[wall_index['d']] == 0 and self.is_valid_location(x, y - steps):
+                visited = self.grid[x][y - steps].visited
 
         return visited
 
-    def get_adjacent_distances(self, x, y, heading, sensors, get_behind=True):
+    def get_adjacent_distances_and_visited_flags(self, x, y, heading, sensors, get_behind=True):
+        """
+        Returns adjacent distances in robot's coordinates
+        :param x: Current x position
+        :param y: Current y position
+        :param heading: Direction where robot is heading
+        :param sensors: Available spaces, as per sensors
+        :param get_behind: If we are interested in the value of the cell behind
+        :return: array of adjacent distances and if the cells have been visited
+        """
 
-        # Placeholder (robot's coordinates)
         distances = [WALL_VALUE, WALL_VALUE, WALL_VALUE, WALL_VALUE]
         visited = ['', '', '', '']
 
