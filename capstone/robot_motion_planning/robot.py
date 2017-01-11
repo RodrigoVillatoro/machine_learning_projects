@@ -35,8 +35,10 @@ class Robot(object):
         # Algorithm to use:
         if str(sys.argv[2]).lower() == 'ff':
             self.algorithm = 'flood-fill'
-        elif str(sys.argv[2]).lower() == 'pr':
-            self.algorithm = 'prefer-right'
+        elif str(sys.argv[2]).lower() == 'ar':
+            self.algorithm = 'always-right'
+        elif str(sys.argv[2]).lower() == 'mr':
+            self.algorithm = 'modified-right'
 
         # Explore after reaching center of the maze:
         if str(sys.argv[3]).lower() == 'true':
@@ -227,9 +229,16 @@ class Robot(object):
 
             # First round (looking for center of the maze)
             if self.algorithm == 'flood-fill':
-                rotation, movement = self.first_round(x, y, heading, sensors)
+                rotation, movement = self.flood_fill(x, y, heading, sensors)
+            elif self.algorithm == 'always-right':
+                rotation, movement = self.always_right(
+                    x, y, heading, sensors)
+            elif self.algorithm == 'modified-right':
+                rotation, movement = self.modified_right(
+                    x, y, heading, sensors)
             else:
-                rotation, movement = self.always_right(x, y, heading, sensors)
+                # To Do: Raise Exception
+                pass
 
             self.steps_first_round += 1
 
@@ -241,6 +250,50 @@ class Robot(object):
         return rotation, movement
 
     def always_right(self, x, y, heading, sensors):
+
+        # 1) Get adjacent distances from sensors
+        adj_distances, adj_visited = self.terrain.get_adj_info(
+            x, y, heading, sensors)
+
+        if adj_distances[2] != WALL_VALUE:
+            valid_index = 2
+        elif adj_distances[1] != WALL_VALUE:
+            valid_index = 1
+        elif adj_distances[0] != WALL_VALUE:
+            valid_index = 0
+        else:
+            valid_index = 3
+
+        rotation, movement = self.convert_from_index(valid_index)
+
+        return rotation, movement
+
+    def modified_right(self, x, y, heading, sensors):
+
+        # 1) Get adjacent distances from sensors
+        adj_distances, adj_visited = self.terrain.get_adj_info(
+            x, y, heading, sensors)
+
+        if adj_distances[2] != WALL_VALUE and adj_visited[2] != '*':
+            valid_index = 2
+        elif adj_distances[1] != WALL_VALUE and adj_visited[1] != '*':
+            valid_index = 1
+        elif adj_distances[0] != WALL_VALUE and adj_visited[0] != '*':
+            valid_index = 0
+        elif adj_distances[2] != WALL_VALUE:
+            valid_index = 2
+        elif adj_distances[1] != WALL_VALUE:
+            valid_index = 1
+        elif adj_distances[0] != WALL_VALUE:
+            valid_index = 0
+        else:
+            valid_index = 3
+
+        rotation, movement = self.convert_from_index(valid_index)
+
+        return rotation, movement
+
+    def right_check_for_dead_ends(self, x, y, heading, sensors):
 
         if self.is_at_a_dead_end(sensors):
             rotation, movement = self.deal_with_dead_end(x, y, heading)
@@ -264,7 +317,16 @@ class Robot(object):
 
         return rotation, movement
 
-    def first_round(self, x, y, heading, sensors, exploring=False):
+    def flood_fill(self, x, y, heading, sensors, exploring=False):
+        """
+
+        :param x:
+        :param y:
+        :param heading:
+        :param sensors:
+        :param exploring:
+        :return:
+        """
 
         if self.is_at_starting_position(x, y):
             rotation = 0
@@ -433,7 +495,7 @@ class Robot(object):
             return True
 
         # Check for number of steps
-        if self.steps_exploring > 30:
+        if self.steps_exploring > 15:
             return True
 
         # Check for center of the maze:
