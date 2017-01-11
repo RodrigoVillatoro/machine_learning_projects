@@ -17,6 +17,7 @@ class Robot(object):
         self.steps_first_round = 0
         self.steps_final_round = 0
         self.maze_dim = maze_dim
+        self.maze_representation = None
 
         # Goal-related attributes
         center = maze_dim/2
@@ -28,6 +29,7 @@ class Robot(object):
         # For exploring state
         self.exploring = False
         self.steps_exploring = 0
+        self.consecutive_explored_cells = 0
 
         # Initialize terrain
         self.terrain = Terrain(maze_dim)
@@ -39,12 +41,25 @@ class Robot(object):
             self.algorithm = 'always-right'
         elif str(sys.argv[2]).lower() == 'mr':
             self.algorithm = 'modified-right'
+        else:
+            raise ValueError(
+                "Incorrect algorithm name. Options are: "
+                "\n- 'ff': flood-fill"
+                "\n- 'ar': always-right"
+                "\n- 'mr': modified-right (prefers unvisited cells)"
+            )
 
         # Explore after reaching center of the maze:
         if str(sys.argv[3]).lower() == 'true':
             self.explore_after_center = True
         elif str(sys.argv[3]).lower() == 'false':
             self.explore_after_center = False
+        else:
+            raise ValueError(
+                "Incorrect explore value: Options are: "
+                "\n- 'true': to keep exploring after reaching the center"
+                "\n- 'false': to end run immediately after reaching the center"
+            )
 
     def next_move(self, sensors):
         '''
@@ -237,13 +252,15 @@ class Robot(object):
                 rotation, movement = self.modified_right(
                     x, y, heading, sensors)
             else:
-                # To Do: Raise Exception
-                pass
+                raise ValueError('Incorrect algorithm.')
 
             self.steps_first_round += 1
 
         else:
-            # Final round (optimized moved)
+            # Final round (optimized movements)
+            if self.steps_final_round == 0:
+                print('******* FINAL REPORT *******')
+                self.terrain.draw()
             rotation, movement = self.final_round(x, y, heading, sensors)
             self.steps_final_round += 1
 
@@ -318,15 +335,6 @@ class Robot(object):
         return rotation, movement
 
     def flood_fill(self, x, y, heading, sensors, exploring=False):
-        """
-
-        :param x:
-        :param y:
-        :param heading:
-        :param sensors:
-        :param exploring:
-        :return:
-        """
 
         if self.is_at_starting_position(x, y):
             rotation = 0
@@ -353,21 +361,18 @@ class Robot(object):
             # Get min index (guaranteed to not be a wall)
             valid_index = adj_distances.index(min(adj_distances))
 
-            # If we have reached the destination, follow only visited
-            valid_distances = []
-            if self.reached_destination:
-                for i, dist in enumerate(adj_distances[0:3]):
-                    if dist != WALL_VALUE and adj_visited[i] is '*' or \
-                                    adj_visited[i] is 'e':
-                        valid_distances.append(dist)
-            # If it's the first round, prefer cells that have not been visited
-            else:
-                for i, dist in enumerate(adj_distances):
-                    if dist != WALL_VALUE and adj_visited[i] is '':
-                        valid_distances.append(dist)
+            # Prefer unvisited cells
+            possible_distance = WALL_VALUE
+            best_index = WALL_VALUE
+            for i, dist in enumerate(adj_distances):
+                if dist != WALL_VALUE and adj_visited[i] is '':
+                    if dist <= possible_distance:
+                        best_index = i
+                        if best_index == 1:
+                            break
 
-            if valid_distances:
-                valid_index = adj_distances.index(min(valid_distances))
+            if best_index != WALL_VALUE:
+                valid_index = best_index
 
         else:
 
@@ -385,10 +390,12 @@ class Robot(object):
             # Prefer cells that have not been visited
             for i, dist in enumerate(adj_distances):
                 if dist != -1 and adj_visited[i] is '':
+                    self.consecutive_explored_cells = 0
                     valid_index = i
                     break
 
             if valid_index is None:
+                self.consecutive_explored_cells += 1
                 possible_candidate = None
                 for i, dist in enumerate(adj_distances):
                     if dist != -1 and adj_visited[i] is '*':
@@ -435,7 +442,10 @@ class Robot(object):
 
             else:
                 valid_index = self.get_valid_index(x, y, heading, sensors, True)
-                rotation, movement = self.convert_from_index(valid_index)
+                if valid_index is not None:
+                    rotation, movement = self.convert_from_index(valid_index)
+                else:
+                    rotation, movement = 'Reset', 'Reset'
 
         return rotation, movement
 
@@ -466,7 +476,6 @@ class Robot(object):
 
         # 2) Get reference to cell
         cell = self.terrain.grid[x][y]
-
         # 3) Place imaginary wall behind the robot before exiting location
         reverse_direction = dir_reverse[heading]
         index = self.terrain.get_index_of_wall(reverse_direction)
@@ -491,7 +500,10 @@ class Robot(object):
         """
 
         # Check for % of cells covered
-        if self.terrain.get_percentage_of_maze_explored() > 90:
+        if self.terrain.get_percentage_of_maze_explored() > 55:
+            return True
+
+        if self.consecutive_explored_cells >= 3:
             return True
 
         # Check for number of steps
@@ -558,8 +570,7 @@ class Robot(object):
         percentage = self.terrain.get_percentage_of_maze_explored()
         first_round = self.steps_first_round + self.steps_exploring
         final_round = self.steps_final_round
-        print('************ REPORT ************')
-        print('ALGORITHM USED: {}'.format(self.algorithm))
+        print('ALGORITHM USED: {}'.format(self.algorithm.upper()))
         print('EXPLORING AFTER CENTER: {}'.format(self.explore_after_center))
         print('NUMBER OF MOVES FIRST ROUND: {}'.format(first_round))
         print('PERCENTAGE OF MAZE EXPLORED: {}%'.format(percentage))
