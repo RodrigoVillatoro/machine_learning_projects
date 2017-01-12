@@ -425,7 +425,7 @@ class Robot(object):
         """
 
         # Check for % of cells covered
-        if self.terrain.get_percentage_of_maze_explored() > 55:
+        if self.terrain.get_percentage_of_maze_explored() > 80:
             return True
 
         if self.consecutive_explored_cells >= 3:
