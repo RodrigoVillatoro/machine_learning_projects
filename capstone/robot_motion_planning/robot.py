@@ -2,15 +2,16 @@ import sys
 
 from global_variables import (dir_move, dir_reverse, dir_sensors, rotations,
                               wall_index, MAX_DISTANCES, WALL_VALUE)
+from algorithms import AlwaysRight, FloodFill, ModifiedRight
 from terrain import Terrain
 
 
 class Robot(object):
     def __init__(self, maze_dim):
-        '''
+        """
         Used to set up attributes that the robot will use to learn and
         navigate the maze.
-        '''
+        """
 
         # Position-related attributes
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}  # Current pos
@@ -35,12 +36,14 @@ class Robot(object):
         self.terrain = Terrain(maze_dim)
 
         # Algorithm to use:
+        self.algorithm = None
+
         if str(sys.argv[2]).lower() == 'ff':
-            self.algorithm = 'flood-fill'
+            self.algorithm = FloodFill()
         elif str(sys.argv[2]).lower() == 'ar':
-            self.algorithm = 'always-right'
+            self.algorithm = AlwaysRight()
         elif str(sys.argv[2]).lower() == 'mr':
-            self.algorithm = 'modified-right'
+            self.algorithm = ModifiedRight()
         else:
             raise ValueError(
                 "Incorrect algorithm name. Options are: "
@@ -62,7 +65,7 @@ class Robot(object):
             )
 
     def next_move(self, sensors):
-        '''
+        """
         Use this function to determine the next move the robot should make,
         based on the input from the sensors after its previous move. Sensor
         inputs are a list of three distances from the robot's left, front, and
@@ -81,7 +84,7 @@ class Robot(object):
         If the robot wants to end a run (e.g. during the first training run in
         the maze) then returning the tuple ('Reset', 'Reset') will indicate to
         the tester to end the run and return the robot to the start.
-        '''
+        """
 
         # Store current location and direction
         x, y, heading = self.get_current_position()
@@ -133,6 +136,10 @@ class Robot(object):
             self.report_results()
 
         return rotation, movement
+
+    # --------------------------------------------
+    # LOCATION-RELATED
+    # --------------------------------------------
 
     def reset_values(self):
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
@@ -232,27 +239,29 @@ class Robot(object):
                 number_of_walls += 1
         return number_of_walls
 
+    # --------------------------------------------
+    # MOVEMENT-RELATED
+    # --------------------------------------------
+
     def get_next_move(self, x, y, heading, sensors):
 
-        if self.reached_destination and self.exploring:
 
+        if self.reached_destination and self.exploring:
             # Explore
             rotation, movement = self.explore(x, y, heading, sensors)
             self.steps_exploring += 1
 
         elif not self.reached_destination and not self.exploring:
 
-            # First round (looking for center of the maze)
-            if self.algorithm == 'flood-fill':
-                rotation, movement = self.flood_fill(x, y, heading, sensors)
-            elif self.algorithm == 'always-right':
-                rotation, movement = self.always_right(
-                    x, y, heading, sensors)
-            elif self.algorithm == 'modified-right':
-                rotation, movement = self.modified_right(
-                    x, y, heading, sensors)
+            if self.algorithm.name == 'flood-fill' and self.is_at_a_dead_end(sensors):
+                rotation, movement = self.deal_with_dead_end(x, y, heading)
+
             else:
-                raise ValueError('Incorrect algorithm.')
+
+                adj_distances, adj_visited = self.terrain.get_adj_info(
+                    x, y, heading, sensors)
+                valid_index = self.algorithm.get_valid_index(adj_distances, adj_visited)
+                rotation, movement = self.convert_from_index(valid_index)
 
             self.steps_first_round += 1
 
@@ -263,90 +272,6 @@ class Robot(object):
                 self.terrain.draw()
             rotation, movement = self.final_round(x, y, heading, sensors)
             self.steps_final_round += 1
-
-        return rotation, movement
-
-    def always_right(self, x, y, heading, sensors):
-
-        # 1) Get adjacent distances from sensors
-        adj_distances, adj_visited = self.terrain.get_adj_info(
-            x, y, heading, sensors)
-
-        if adj_distances[2] != WALL_VALUE:
-            valid_index = 2
-        elif adj_distances[1] != WALL_VALUE:
-            valid_index = 1
-        elif adj_distances[0] != WALL_VALUE:
-            valid_index = 0
-        else:
-            valid_index = 3
-
-        rotation, movement = self.convert_from_index(valid_index)
-
-        return rotation, movement
-
-    def modified_right(self, x, y, heading, sensors):
-
-        # 1) Get adjacent distances from sensors
-        adj_distances, adj_visited = self.terrain.get_adj_info(
-            x, y, heading, sensors)
-
-        if adj_distances[2] != WALL_VALUE and adj_visited[2] != '*':
-            valid_index = 2
-        elif adj_distances[1] != WALL_VALUE and adj_visited[1] != '*':
-            valid_index = 1
-        elif adj_distances[0] != WALL_VALUE and adj_visited[0] != '*':
-            valid_index = 0
-        elif adj_distances[2] != WALL_VALUE:
-            valid_index = 2
-        elif adj_distances[1] != WALL_VALUE:
-            valid_index = 1
-        elif adj_distances[0] != WALL_VALUE:
-            valid_index = 0
-        else:
-            valid_index = 3
-
-        rotation, movement = self.convert_from_index(valid_index)
-
-        return rotation, movement
-
-    def right_check_for_dead_ends(self, x, y, heading, sensors):
-
-        if self.is_at_a_dead_end(sensors):
-            rotation, movement = self.deal_with_dead_end(x, y, heading)
-
-        else:
-
-            # 1) Get adjacent distances from sensors
-            adj_distances, adj_visited = self.terrain.get_adj_info(
-                x, y, heading, sensors)
-
-            if adj_distances[2] != WALL_VALUE and adj_visited[2] != '*':
-                valid_index = 2
-            elif adj_distances[1] != WALL_VALUE and adj_visited[1] != '*':
-                valid_index = 1
-            elif adj_distances[0] != WALL_VALUE and adj_visited[0] != '*':
-                valid_index = 0
-            else:
-                valid_index = adj_distances.index(min(adj_distances))
-
-            rotation, movement = self.convert_from_index(valid_index)
-
-        return rotation, movement
-
-    def flood_fill(self, x, y, heading, sensors, exploring=False):
-
-        if self.is_at_starting_position(x, y):
-            rotation = 0
-            movement = 1
-
-        # If we reach a dead end:
-        elif self.is_at_a_dead_end(sensors):
-            rotation, movement = self.deal_with_dead_end(x, y, heading)
-
-        else:
-            min_index = self.get_valid_index(x, y, heading, sensors, exploring)
-            rotation, movement = self.convert_from_index(min_index)
 
         return rotation, movement
 
@@ -570,7 +495,7 @@ class Robot(object):
         percentage = self.terrain.get_percentage_of_maze_explored()
         first_round = self.steps_first_round + self.steps_exploring
         final_round = self.steps_final_round
-        print('ALGORITHM USED: {}'.format(self.algorithm.upper()))
+        print('ALGORITHM USED: {}'.format(self.algorithm.name.upper()))
         print('EXPLORING AFTER CENTER: {}'.format(self.explore_after_center))
         print('NUMBER OF MOVES FIRST ROUND: {}'.format(first_round))
         print('PERCENTAGE OF MAZE EXPLORED: {}%'.format(percentage))
