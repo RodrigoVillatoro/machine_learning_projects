@@ -202,34 +202,13 @@ class Terrain:
 
         return distances, visited
 
-    def get_adjacent_distances_visited_cells(self, x, y):
+    def get_adjacent_distances_for_cell(self, x, y):
 
-        # Placeholder: left, up, right, down
         distances = list(MAX_DISTANCES)
-
-        walls = self.grid[x][y].get_total_walls()
-
-        for i, wall in enumerate(walls):
-            if wall == 0:
-                # Left
-                if i == 0:
-                    new_x = x - 1
-                    new_y = y
-                # Up
-                elif i == 1:
-                    new_x = x
-                    new_y = y + 1
-                # Right
-                elif i == 2:
-                    new_x = x + 1
-                    new_y = y
-                # Down
-                else:
-                    new_x = x
-                    new_y = y - 1
-
-                if self.is_valid_location(new_x, new_y):
-                    distances[i] = self.grid[new_x][new_y].distance
+        distances[0] = self.get_distance(x, y, 'left')
+        distances[1] = self.get_distance(x, y, 'up')
+        distances[2] = self.get_distance(x, y, 'right')
+        distances[3] = self.get_distance(x, y, 'down')
 
         return distances
 
@@ -250,7 +229,7 @@ class Terrain:
             current_distance = self.grid[x][y].distance
 
             # Get adjacent distances
-            adj_distances = self.get_adjacent_distances_visited_cells(x, y)
+            adj_distances = self.get_adjacent_distances_for_cell(x, y)
 
             # Get the minimum
             min_distance = min(adj_distances)
