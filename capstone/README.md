@@ -40,10 +40,10 @@ python tester.py test_maze.01 ff false
 
 The third argument is the maze we want to test, the fourth argument is the algorithm we want to use, and the fifth argument states if the robot should explore more cells after reaching the center. 
 
-These are the options for each argument
+These are the options for each argument:
 
-* (arg # 3):  test_maze_01.txt, test_maze_02.txt, test_maze_03.txt, test_maze_04.txt
-* (arg # 4):  ff = Flood-Fill, ar = Always-Right, mr = Modified-Right
+* (arg # 3): test_maze_01.txt, test_maze_02.txt, test_maze_03.txt, test_maze_04.txt
+* (arg # 4): ff = Flood-Fill, ar = Always-Right, mr = Modified-Right
 * (arg # 5): true, false
 
 
@@ -52,5 +52,3 @@ These are the options for each argument
 Python 2.7.X
 
 Numpy
-
-python tester.py test_maze_01.txt ar false
