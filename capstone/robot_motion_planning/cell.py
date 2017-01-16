@@ -2,10 +2,14 @@ from global_variables import WALL_VALUE
 
 
 class Cell:
+    """
+    Represents any of the cells in a maze (it has walls, a distance to the
+    center, and information on whether it has been visited before by the
+    robot or not).
+    """
 
     def __init__(self, real_walls=None, distance=0, visited=''):
         """
-        Represents a particular cell in the maze
         :param real_walls: array of 0's (no walls) and 1's (walls) [l, u, r, d]
         :param distance: distance from that cell to the center of the maze
         :param visited: str; directions = < ^ > V; x = dead end, * = visited

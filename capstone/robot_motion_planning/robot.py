@@ -245,9 +245,7 @@ class Robot(object):
 
     def get_next_move(self, x, y, heading, sensors):
 
-
         if self.reached_destination and self.exploring:
-            # Explore
             rotation, movement = self.explore(x, y, heading, sensors)
             self.steps_exploring += 1
 
